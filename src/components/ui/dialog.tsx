@@ -11,18 +11,19 @@ interface DialogProps {
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   React.useEffect(() => {
+    if (!open) return;
+
+    const prevOverflow = document.body.style.overflow;
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onOpenChange(false);
     };
-    
-    if (open) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
+
+    document.addEventListener('keydown', handleEscape);
+    document.body.style.overflow = 'hidden';
     
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = '';
+      document.body.style.overflow = prevOverflow;
     };
   }, [open, onOpenChange]);
 

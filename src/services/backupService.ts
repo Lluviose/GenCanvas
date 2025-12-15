@@ -447,7 +447,7 @@ export const restoreFromWebDAV = async (
     const blob = new Blob([downloadResult.data], { type: 'application/json' });
     const file = new File([blob], filename);
     return importBackupData(file, options);
-  } catch (error: any) {
+  } catch {
     return { success: false, message: '解析备份文件失败' };
   }
 };

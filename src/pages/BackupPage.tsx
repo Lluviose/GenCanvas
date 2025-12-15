@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -108,7 +108,7 @@ export default function BackupPage() {
     }
   };
 
-  const getPreviewStats = () => {
+  const previewStats = useMemo(() => {
     const data = exportBackupData({ includeCanvases });
     return {
       galleryImages: data.galleryImages.length,
@@ -117,12 +117,6 @@ export default function BackupPage() {
       canvases: Object.values(data.canvases || {}).flat().length,
       canvasSnapshots: Object.keys(data.canvasSnapshots || {}).length,
     };
-  };
-
-  const [previewStats, setPreviewStats] = useState<ReturnType<typeof getPreviewStats> | null>(null);
-
-  useEffect(() => {
-    setPreviewStats(getPreviewStats());
   }, [includeCanvases]);
 
   // ============ WebDAV ============

@@ -28,7 +28,8 @@ const extractImagesFromResponse = (data: any) => {
   const images: Base64Image[] = [];
   const imageThoughtSignatures: Array<string | undefined> = [];
   const texts: string[] = [];
-  if (!data) return { images, imageThoughtSignatures, texts };
+  let signedTextPart: { text: string; thoughtSignature: string } | null = null;
+  if (!data) return { images, imageThoughtSignatures, texts, signedTextPart };
   const chunks = Array.isArray(data) ? data : [data];
   for (const chunk of chunks) {
     const candidate = Array.isArray(chunk?.candidates) ? chunk.candidates[0] : chunk?.candidates?.[0] || null;
@@ -62,11 +63,21 @@ const extractImagesFromResponse = (data: any) => {
               : undefined
         );
       } else if (part?.text) {
-        texts.push(String(part.text));
+        const text = String(part.text);
+        texts.push(text);
+        if (!signedTextPart) {
+          const sig =
+            typeof part?.thought_signature === 'string'
+              ? part.thought_signature
+              : typeof part?.thoughtSignature === 'string'
+                ? part.thoughtSignature
+                : undefined;
+          if (sig) signedTextPart = { text, thoughtSignature: String(sig) };
+        }
       }
     }
   }
-  return { images, imageThoughtSignatures, texts };
+  return { images, imageThoughtSignatures, texts, signedTextPart };
 };
 
 const extractTextAndSignatureFromResponse = (data: any) => {
@@ -416,12 +427,18 @@ export const generateWorkbench = async (payload: WorkbenchGenerateRequest): Prom
   const startAt = Date.now();
   const images: Base64Image[] = [];
   const imageThoughtSignatures: Array<string | undefined> = [];
+  const imageTextParts: Array<string | undefined> = [];
+  const imageTextThoughtSignatures: Array<string | undefined> = [];
   const texts: string[] = [];
   for (let i = 0; i < count; i++) {
     const resp = await callGeminiLike(s, requestBody);
     const extracted = extractImagesFromResponse(resp);
     images.push(...extracted.images);
     imageThoughtSignatures.push(...(extracted.imageThoughtSignatures || []));
+    for (let j = 0; j < (extracted.images || []).length; j++) {
+      imageTextParts.push(extracted.signedTextPart?.text);
+      imageTextThoughtSignatures.push(extracted.signedTextPart?.thoughtSignature);
+    }
     texts.push(...extracted.texts);
   }
 
@@ -434,6 +451,8 @@ export const generateWorkbench = async (payload: WorkbenchGenerateRequest): Prom
     durationSeconds: Math.round(durationMs / 1000),
     images,
     imageThoughtSignatures,
+    imageTextParts,
+    imageTextThoughtSignatures,
     message: texts.join(' '),
   } as WorkbenchGenerateResponse;
 };

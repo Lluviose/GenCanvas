@@ -525,7 +525,7 @@ export default function GalleryPage() {
                 <Button
                   variant={showImageHighQualityOnly ? 'secondary' : 'outline'}
                   onClick={() => setShowImageHighQualityOnly((v) => !v)}
-                  title="只看 AI 高分（≥80）"
+                  title={`只看 AI 高分（≥${imageHighQualityThreshold}）`}
                 >
                   <Wand2 className="h-4 w-4 mr-2" />
                   优质
@@ -719,7 +719,7 @@ export default function GalleryPage() {
                 <Button
                   variant={promptHighQualityOnly ? 'secondary' : 'outline'}
                   onClick={() => setPromptHighQualityOnly((v) => !v)}
-                  title="只看 AI 高分（≥80）"
+                  title={`只看 AI 高分（≥${promptHighQualityThreshold}）`}
                 >
                   <Wand2 className="h-4 w-4 mr-2" />
                   优质

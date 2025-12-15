@@ -647,6 +647,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         return sig ? String(sig) : undefined;
       };
 
+      const getThoughtTextSignature = (img: ImageMeta) => {
+        const meta = img?.meta as any;
+        const sig =
+          typeof meta?.thoughtTextSignature === 'string'
+            ? meta.thoughtTextSignature
+            : typeof meta?.thought_text_signature === 'string'
+              ? meta.thought_text_signature
+              : undefined;
+        return sig ? String(sig) : undefined;
+      };
+
+      const getThoughtText = (img: ImageMeta) => {
+        const meta = img?.meta as any;
+        const text =
+          typeof meta?.thoughtText === 'string'
+            ? meta.thoughtText
+            : typeof meta?.thought_text === 'string'
+              ? meta.thought_text
+              : undefined;
+        const cleaned = typeof text === 'string' ? text.trim() : '';
+        return cleaned ? cleaned : undefined;
+      };
+
       const findImageById = (owner: AppNode, id: string) =>
         owner.data.images?.find((img) => img.id === id) || snapshot.galleryImages.find((img) => img.id === id) || null;
 
@@ -688,7 +711,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           const inline = { inline_data: { mime_type: b64.mimeType, data: b64.data } };
           const sig = getThoughtSignature(imageMeta);
           if (sig) {
-            contents.push({ role: 'model', parts: [{ ...inline, thought_signature: sig }] as any } as any);
+            const parts: any[] = [];
+            const textSig = getThoughtTextSignature(imageMeta);
+            const text = getThoughtText(imageMeta);
+            if (textSig && text) parts.push({ text, thought_signature: textSig });
+            parts.push({ ...inline, thought_signature: sig });
+            contents.push({ role: 'model', parts } as any);
           } else {
             contents.push({
               role: 'user',
@@ -1271,15 +1299,55 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         }
       }
 
-      const resp = await generateWorkbench({
-        prompt: mergedData.prompt,
-        promptParts: mergedData.promptParts,
-        contents: options?.contents,
-        count: mergedData.count,
-        imageSize: mergedData.imageSize,
-        aspectRatio: mergedData.aspectRatio,
-        inputImage,
-      });
+      const resp = await (async () => {
+        try {
+          return await generateWorkbench({
+            prompt: mergedData.prompt,
+            promptParts: mergedData.promptParts,
+            contents: options?.contents,
+            count: mergedData.count,
+            imageSize: mergedData.imageSize,
+            aspectRatio: mergedData.aspectRatio,
+            inputImage,
+          });
+        } catch (error: any) {
+          const message = String(error?.message || '');
+          const shouldFallback =
+            hasCustomContents && /thought_signature|MISSING_THOUGHT_SIGNATURE/i.test(message);
+          if (!shouldFallback) throw error;
+
+          let fallbackInput: Base64Image | undefined = inputImage;
+          if (!fallbackInput) {
+            const refId = String(mergedData.referenceImageId || '').trim();
+            if (refId) {
+              const refUrl =
+                state.galleryImages.find((img) => img.id === refId)?.url ||
+                node.data.images?.find((img) => img.id === refId)?.url ||
+                '';
+              if (refUrl) {
+                try {
+                  fallbackInput = await toBase64ImageFromUrl(refUrl);
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+
+          if (!options?.silent) {
+            toast.info('多轮对话继续失败，已降级为仅发送该图继续生成');
+          }
+
+          return await generateWorkbench({
+            prompt: mergedData.prompt,
+            promptParts: mergedData.promptParts,
+            count: mergedData.count,
+            imageSize: mergedData.imageSize,
+            aspectRatio: mergedData.aspectRatio,
+            inputImage: fallbackInput,
+          });
+        }
+      })();
 
       const images = resp.images || [];
       if (!images.length) {
@@ -1303,6 +1371,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           aspectRatio: mergedData.aspectRatio,
           referenceImageId: mergedData.referenceImageId,
           thoughtSignature: resp.imageThoughtSignatures?.[idx],
+          thoughtText: resp.imageTextParts?.[idx],
+          thoughtTextSignature: resp.imageTextThoughtSignatures?.[idx],
         },
       }));
 

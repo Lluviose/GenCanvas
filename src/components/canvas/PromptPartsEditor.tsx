@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import type { ImagePolicy } from '@/types/media';
 import type { PromptImagePart, PromptPart } from '@/types';
 import { cn } from '@/lib/utils';
-import { fileToBase64Image, toImageSrc } from '@/lib/imageProcessing';
+import { estimateBase64Bytes, fileToBase64Image, formatBytes, toImageSrc } from '@/lib/imageProcessing';
 import { extractPromptPlainText, hasPromptImages, normalizePromptParts } from '@/lib/promptParts';
 import { toast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -314,8 +314,32 @@ export function PromptPartsEditor({
 
       setIsReadingFiles(true);
       try {
+        const maxImageBytes = Math.max(0, Number(DEFAULT_IMAGE_POLICY.maxImageMB || 0)) * 1024 * 1024;
+        const maxTotalBytes = Math.max(0, Number(DEFAULT_IMAGE_POLICY.maxTotalMB || 0)) * 1024 * 1024;
+
+        let totalBytes = 0;
+        for (const it of imagesRef.current.values()) {
+          totalBytes += estimateBase64Bytes(String(it?.data || ''));
+        }
+
         for (const file of slice) {
           const base64 = await fileToBase64Image(file, DEFAULT_IMAGE_POLICY);
+          const bytes = estimateBase64Bytes(base64.data);
+
+          if (maxImageBytes > 0 && bytes > maxImageBytes) {
+            toast.error(
+              `单张图片过大：${file.name}（${formatBytes(bytes)}），上限 ${DEFAULT_IMAGE_POLICY.maxImageMB} MB`
+            );
+            continue;
+          }
+
+          if (maxTotalBytes > 0 && totalBytes + bytes > maxTotalBytes) {
+            toast.error(
+              `参考图总大小超限：当前 ${formatBytes(totalBytes)}，新增 ${formatBytes(bytes)}，上限 ${DEFAULT_IMAGE_POLICY.maxTotalMB} MB`
+            );
+            break;
+          }
+
           const img: PromptImagePart = {
             type: 'image',
             id: makeId('ppimg'),
@@ -325,6 +349,7 @@ export function PromptPartsEditor({
           };
           imagesRef.current.set(img.id, img);
           insertImageAtCaret(img);
+          totalBytes += bytes;
         }
         emitChangeFromDom();
       } catch (error: any) {

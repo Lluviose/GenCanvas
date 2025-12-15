@@ -62,6 +62,12 @@ export interface WorkbenchGenerateResponse {
   durationSeconds?: number;
   images?: Base64Image[];
   imageThoughtSignatures?: Array<string | undefined>;
+  /**
+   * 生成响应中“带 thought_signature 的首个文本 part”（若存在），按图片对齐复制一份。
+   * 用于多轮对话时更完整地回传签名，避免 MISSING_THOUGHT_SIGNATURE。
+   */
+  imageTextParts?: Array<string | undefined>;
+  imageTextThoughtSignatures?: Array<string | undefined>;
   message?: string;
   errorCode?: string;
   error?: string;

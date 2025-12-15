@@ -226,6 +226,18 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     setAiChatOpen(false);
   }, [effectiveSelectedNodeId, selectedNode]);
 
+  useEffect(() => {
+    if (!selectedNode) return;
+    const imgs = selectedNode.data.images || [];
+    if (imgs.length === 0) {
+      if (activeImageId) setActiveImageId(null);
+      return;
+    }
+    if (!activeImageId || !imgs.some((img) => img.id === activeImageId)) {
+      setActiveImageId(imgs[0].id);
+    }
+  }, [selectedNode?.data?.images, activeImageId, selectedNode]);
+
   const promptSuggestion = useMemo(() => {
     const parsed = selectedNode?.data?.promptAnalysis?.parsed;
     const suggestedPrompt = typeof parsed?.suggestedPrompt === 'string' ? parsed.suggestedPrompt : '';

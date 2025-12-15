@@ -16,7 +16,7 @@ export default function CanvasesPage() {
   const { canvasesByProject, hydrate: hydrateCanvases, addCanvas, updateCanvas, deleteCanvas, duplicateCanvas } =
     useCanvasesStore();
 
-  const canvases = canvasesByProject[projectId] || [];
+  const canvases = useMemo(() => canvasesByProject[projectId] || [], [canvasesByProject, projectId]);
 
   const [keyword, setKeyword] = useState('');
 
@@ -348,4 +348,3 @@ export default function CanvasesPage() {
     </div>
   );
 }
-
