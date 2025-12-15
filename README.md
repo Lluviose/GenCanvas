@@ -116,7 +116,7 @@ npm start
 ## 开源发布到 GitHub
 
 - 已提供 `LICENSE`（MIT）与 `.gitignore`（忽略 `node_modules/`、`dist/`、`.env*`）。
-- 上传前请确认仓库中参考资料（如 `gemini api文档和api参考.md`、`生图前端4.9-修改版.html`）的版权/授权是否允许公开分发。
+- 参考资料（如 `gemini api文档和api参考.md`、`生图前端4.9-修改版.html`）默认已被 `.gitignore` 排除；如需公开发布，请先确认版权/授权允许分发。
 - 不要把任何 API Key 写入仓库（本项目默认只把 Key 保存在浏览器 `localStorage`）。
 
 ## 代码结构速览
