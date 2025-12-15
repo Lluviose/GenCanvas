@@ -19,6 +19,14 @@ import { ImageMeta, NodeData, NodeRevision, PromptAsset } from '@/types';
 import { blobToBase64Image, toImageSrc } from '@/lib/imageProcessing';
 import { hasEffectivePromptContent, hasPromptImages, normalizePromptParts } from '@/lib/promptParts';
 import {
+  saveImages as saveImagesToIndexedDB,
+  parseDataUrl,
+  createIndexedDBRef,
+  isIndexedDBRef,
+  resolveImageUrl,
+  type StoredImage,
+} from '@/services/imageStorage';
+import {
   analyzeImage as analyzeImageApi,
   analyzePrompt as analyzePromptApi,
   chatAnalyze,
@@ -110,6 +118,17 @@ const toBase64ImageFromUrl = async (url: string): Promise<Base64Image> => {
     const mimeMatch = meta.match(/^data:(.*?);base64$/);
     const mimeType = mimeMatch?.[1] || 'image/png';
     return { mimeType, data: data || '' };
+  }
+  // Handle IndexedDB references
+  if (isIndexedDBRef(url)) {
+    const resolvedUrl = await resolveImageUrl(url);
+    if (resolvedUrl && resolvedUrl.startsWith('data:')) {
+      const [meta, data] = resolvedUrl.split(',');
+      const mimeMatch = meta.match(/^data:(.*?);base64$/);
+      const mimeType = mimeMatch?.[1] || 'image/png';
+      return { mimeType, data: data || '' };
+    }
+    throw new Error('无法从 IndexedDB 读取图片');
   }
   const res = await fetch(url);
   if (!res.ok) throw new Error('无法读取图片内容');
@@ -1788,24 +1807,42 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const now = new Date().toISOString();
       const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      const normalized: ImageMeta[] = images.map((img, idx) => ({
-        id: `img_${id}_${Date.now()}_${idx}`,
-        nodeId: id,
-        jobId,
-        url: toImageSrc(img),
-        createdAt: now,
-        isFavorite: false,
-        meta: {
-          prompt: mergedData.prompt,
-          model: mergedData.modelName,
-          imageSize: mergedData.imageSize,
-          aspectRatio: mergedData.aspectRatio,
-          referenceImageId: mergedData.referenceImageId,
-          thoughtSignature: resp.imageThoughtSignatures?.[idx],
-          thoughtText: resp.imageTextParts?.[idx],
-          thoughtTextSignature: resp.imageTextThoughtSignatures?.[idx],
-        },
-      }));
+      // Prepare images for IndexedDB storage
+      const storedImages: StoredImage[] = [];
+      const normalized: ImageMeta[] = images.map((img, idx) => {
+        const imageId = `img_${id}_${Date.now()}_${idx}`;
+        const dataUrl = toImageSrc(img);
+        const parsed = parseDataUrl(imageId, dataUrl);
+        if (parsed) {
+          storedImages.push(parsed);
+        }
+        return {
+          id: imageId,
+          nodeId: id,
+          jobId,
+          // Use IndexedDB reference if parsed successfully, otherwise fallback to data URL
+          url: parsed ? createIndexedDBRef(imageId) : dataUrl,
+          createdAt: now,
+          isFavorite: false,
+          meta: {
+            prompt: mergedData.prompt,
+            model: mergedData.modelName,
+            imageSize: mergedData.imageSize,
+            aspectRatio: mergedData.aspectRatio,
+            referenceImageId: mergedData.referenceImageId,
+            thoughtSignature: resp.imageThoughtSignatures?.[idx],
+            thoughtText: resp.imageTextParts?.[idx],
+            thoughtTextSignature: resp.imageTextThoughtSignatures?.[idx],
+          },
+        };
+      });
+
+      // Save images to IndexedDB (async, non-blocking)
+      if (storedImages.length > 0) {
+        saveImagesToIndexedDB(storedImages).catch((err) => {
+          console.warn('Failed to save images to IndexedDB', err);
+        });
+      }
 
       const partialErrors = resp.partialErrors || [];
       const requestedCount = Number(resp.requestedCount ?? mergedData.count) || mergedData.count;

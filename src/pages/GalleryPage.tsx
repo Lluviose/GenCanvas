@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
+import { ResolvedImage } from '@/components/ui/ResolvedImage';
 import {
   Dialog,
   DialogContent,
@@ -623,7 +624,7 @@ export default function GalleryPage() {
                         title="查看详情"
                       >
                         <div className={mediaWrapperClass}>
-                          <img src={img.url} alt={img.id} className={imageClass} />
+                          <ResolvedImage src={img.url} alt={img.id} className={imageClass} />
                         </div>
 
                         {selectMode ? (

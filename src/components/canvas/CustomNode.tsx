@@ -3,6 +3,8 @@ import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { NodeData } from '@/types';
 import { cn } from '@/lib/utils';
 import { hasEffectivePromptContent } from '@/lib/promptParts';
+import { ResolvedImage } from '@/components/ui/ResolvedImage';
+import { resolveImageUrl } from '@/services/imageStorage';
 import { 
   Play, 
   RotateCcw,
@@ -183,7 +185,12 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
   
   const handleDownloadImage = async (url: string, id: string) => {
     try {
-      const response = await fetch(url);
+      // Resolve idb:// URLs before downloading
+      const resolvedUrl = await resolveImageUrl(url);
+      if (!resolvedUrl) {
+        throw new Error('无法获取图片数据');
+      }
+      const response = await fetch(resolvedUrl);
       if (!response.ok) {
         throw new Error(`下载失败: HTTP ${response.status}`);
       }
@@ -430,7 +437,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   // 可以添加预览大图逻辑，目前先仅选中
                 }}
               >
-                <img 
+                <ResolvedImage 
                   src={img.url} 
                   alt={`生成图片 ${idx + 1}`} 
                   className="object-cover w-full h-full transition-transform group-hover/img:scale-105" 

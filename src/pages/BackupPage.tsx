@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -108,15 +108,27 @@ export default function BackupPage() {
     }
   };
 
-  const previewStats = useMemo(() => {
-    const data = exportBackupData({ includeCanvases });
-    return {
-      galleryImages: data.galleryImages.length,
-      promptLibrary: data.promptLibrary.length,
-      projects: data.projects?.length || 0,
-      canvases: Object.values(data.canvases || {}).flat().length,
-      canvasSnapshots: Object.keys(data.canvasSnapshots || {}).length,
-    };
+  const [previewStats, setPreviewStats] = useState({
+    galleryImages: 0,
+    promptLibrary: 0,
+    projects: 0,
+    canvases: 0,
+    canvasSnapshots: 0,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    exportBackupData({ includeCanvases }).then((data) => {
+      if (cancelled) return;
+      setPreviewStats({
+        galleryImages: data.galleryImages.length,
+        promptLibrary: data.promptLibrary.length,
+        projects: data.projects?.length || 0,
+        canvases: Object.values(data.canvases || {}).flat().length,
+        canvasSnapshots: Object.keys(data.canvasSnapshots || {}).length,
+      });
+    });
+    return () => { cancelled = true; };
   }, [includeCanvases]);
 
   // ============ WebDAV ============

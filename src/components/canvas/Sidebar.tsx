@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { hasEffectivePromptContent } from '@/lib/promptParts';
+import { ResolvedImage } from '@/components/ui/ResolvedImage';
 import { BookMarked, Copy, GitBranch, Image as ImageIcon, Loader2, Play, RotateCcw, Sparkles, Star, Trash2, Wand2, X, ArrowRight, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PromptPartsEditor } from './PromptPartsEditor';
 import { AiChatDialog } from './AiChatDialog';
@@ -567,7 +568,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                         key={img.id}
                         className="relative aspect-square rounded-lg overflow-hidden border border-border bg-background"
                       >
-                        <img src={img.url} alt={img.id} className="w-full h-full object-cover" />
+                        <ResolvedImage src={img.url} alt={img.id} className="w-full h-full object-cover" />
                       </div>
                     ))}
                   </div>
@@ -1608,7 +1609,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                   onClick={() => setActiveImageId(img.id)}
                   title="选择图片"
                 >
-                  <img src={img.url} alt={img.id} className="w-full h-full object-cover" />
+                  <ResolvedImage src={img.url} alt={img.id} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

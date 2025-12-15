@@ -3,6 +3,14 @@
  */
 
 import type { ImageMeta, PromptAsset, Project, Canvas } from '@/types';
+import {
+  isIndexedDBRef,
+  resolveImageUrl,
+  parseDataUrl,
+  saveImages as saveImagesToIndexedDB,
+  createIndexedDBRef,
+  type StoredImage,
+} from '@/services/imageStorage';
 
 // ============ 数据结构 ============
 
@@ -84,25 +92,76 @@ export const loadAllCanvasSnapshots = (): Record<string, any> => {
 
 // ============ 本地导出 ============
 
-export const exportBackupData = (options?: { includeCanvases?: boolean }): BackupData => {
+export const exportBackupData = async (options?: { includeCanvases?: boolean }): Promise<BackupData> => {
+  const galleryImages = loadGalleryImages();
+  
+  // Resolve all idb:// URLs to actual data URLs for export
+  const resolvedGalleryImages: ImageMeta[] = await Promise.all(
+    galleryImages.map(async (img) => {
+      if (isIndexedDBRef(img.url)) {
+        const resolvedUrl = await resolveImageUrl(img.url);
+        return { ...img, url: resolvedUrl || '' };
+      }
+      return img;
+    })
+  );
+
   const data: BackupData = {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    galleryImages: loadGalleryImages(),
+    galleryImages: resolvedGalleryImages.filter((img) => img.url), // Filter out images that failed to resolve
     promptLibrary: loadPromptLibrary(),
   };
 
   if (options?.includeCanvases) {
     data.projects = loadProjects();
     data.canvases = loadAllCanvases();
-    data.canvasSnapshots = loadAllCanvasSnapshots();
+    
+    // Also resolve idb:// URLs in canvas snapshots
+    const rawSnapshots = loadAllCanvasSnapshots();
+    const resolvedSnapshots: Record<string, any> = {};
+    
+    for (const [key, snapshot] of Object.entries(rawSnapshots)) {
+      if (!snapshot || !Array.isArray(snapshot.nodes)) {
+        resolvedSnapshots[key] = snapshot;
+        continue;
+      }
+      
+      const resolvedNodes = await Promise.all(
+        snapshot.nodes.map(async (node: any) => {
+          if (!node?.data?.images || !Array.isArray(node.data.images)) return node;
+          
+          const resolvedImages = await Promise.all(
+            node.data.images.map(async (img: ImageMeta) => {
+              if (isIndexedDBRef(img.url)) {
+                const resolvedUrl = await resolveImageUrl(img.url);
+                return { ...img, url: resolvedUrl || '' };
+              }
+              return img;
+            })
+          );
+          
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              images: resolvedImages.filter((img: ImageMeta) => img.url),
+            },
+          };
+        })
+      );
+      
+      resolvedSnapshots[key] = { ...snapshot, nodes: resolvedNodes };
+    }
+    
+    data.canvasSnapshots = resolvedSnapshots;
   }
 
   return data;
 };
 
-export const downloadBackupAsJSON = (options?: { includeCanvases?: boolean }) => {
-  const data = exportBackupData(options);
+export const downloadBackupAsJSON = async (options?: { includeCanvases?: boolean }) => {
+  const data = await exportBackupData(options);
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -148,15 +207,35 @@ export const importBackupData = async (
       promptLibrary: 0,
     };
 
-    // 导入图片库
+    // 导入图片库 - 将 data URL 转换为 IndexedDB 引用
     if (Array.isArray(data.galleryImages)) {
+      const storedImages: StoredImage[] = [];
+      const processedImages: ImageMeta[] = data.galleryImages.map((img) => {
+        // If already an idb:// reference, keep as-is
+        if (isIndexedDBRef(img.url)) return img;
+        // If it's a data URL, convert to IndexedDB storage
+        if (img.url && img.url.startsWith('data:')) {
+          const parsed = parseDataUrl(img.id, img.url);
+          if (parsed) {
+            storedImages.push(parsed);
+            return { ...img, url: createIndexedDBRef(img.id) };
+          }
+        }
+        return img;
+      });
+
+      // Save images to IndexedDB
+      if (storedImages.length > 0) {
+        await saveImagesToIndexedDB(storedImages);
+      }
+
       if (mode === 'replace') {
-        localStorage.setItem(STORAGE_KEYS.galleryImages, JSON.stringify(data.galleryImages));
-        stats.galleryImages = data.galleryImages.length;
+        localStorage.setItem(STORAGE_KEYS.galleryImages, JSON.stringify(processedImages));
+        stats.galleryImages = processedImages.length;
       } else {
         const existing = loadGalleryImages();
         const existingIds = new Set(existing.map((i) => i.id));
-        const newItems = data.galleryImages.filter((i) => !existingIds.has(i.id));
+        const newItems = processedImages.filter((i) => !existingIds.has(i.id));
         const merged = [...existing, ...newItems];
         localStorage.setItem(STORAGE_KEYS.galleryImages, JSON.stringify(merged));
         stats.galleryImages = newItems.length;
