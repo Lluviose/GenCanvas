@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { hasEffectivePromptContent } from '@/lib/promptParts';
 import { 
   Play, 
+  RotateCcw,
   MoreHorizontal, 
   Star, 
   Image as ImageIcon,
@@ -12,6 +13,8 @@ import {
   CheckCircle2,
   Loader2,
   GitBranch,
+  ChevronDown,
+  ChevronRight,
   ArrowRight,
   Copy,
   Trash2,
@@ -70,15 +73,13 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
   const status = statusConfig[data.status] || statusConfig.idle;
   const setSelectedNodeId = useCanvasStore((state) => state.setSelectedNodeId);
   const commitNodeEdit = useCanvasStore((state) => state.commitNodeEdit);
-  const generateNode = useCanvasStore((state) => state.generateNode);
-  const branchNode = useCanvasStore((state) => state.branchNode);
-  const continueFromImage = useCanvasStore((state) => state.continueFromImage);
-  const continueFromImageMode = usePreferencesStore((s) => s.prefs.continueFromImageMode);
-  const continueHistoryNodes = usePreferencesStore((s) => s.prefs.continueHistoryNodes);
+  const updateNodeData = useCanvasStore((state) => state.updateNodeData);
+  const generateFromNode = useCanvasStore((state) => state.generateFromNode);
   const duplicateNode = useCanvasStore((state) => state.duplicateNode);
   const removeNode = useCanvasStore((state) => state.removeNode);
   const toggleFavoriteNode = useCanvasStore((state) => state.toggleFavoriteNode);
   const toggleFavoriteImage = useCanvasStore((state) => state.toggleFavoriteImage);
+  const prefs = usePreferencesStore((s) => s.prefs);
   const parentId = useCanvasStore((state) => state.edges.find((e) => e.target === data.id)?.source || null);
   const parentPrompt = useCanvasStore((state) => {
     const pid = state.edges.find((e) => e.target === data.id)?.source;
@@ -86,14 +87,30 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
     const p = state.nodes.find((n) => n.id === pid)?.data?.prompt || '';
     return String(p || '').trim();
   });
-  const childCount = useCanvasStore((state) => state.edges.filter((e) => e.source === data.id).length);
-  const firstChildId = useCanvasStore((state) => state.edges.find((e) => e.source === data.id)?.target || null);
+  const childCount = useCanvasStore((state) =>
+    state.edges
+      .filter((e) => e.source === data.id)
+      .filter((e) => {
+        const child = state.nodes.find((n) => n.id === e.target);
+        return Boolean(child && !child.data.archived);
+      }).length
+  );
+  const firstChildId = useCanvasStore((state) => {
+    const edge = state.edges.find((e) => {
+      if (e.source !== data.id) return false;
+      const child = state.nodes.find((n) => n.id === e.target);
+      return Boolean(child && !child.data.archived);
+    });
+    return edge?.target || null;
+  });
   const { getNode, fitView } = useReactFlow();
   const [isEditing, setIsEditing] = useState(false);
   const [draftPrompt, setDraftPrompt] = useState(data.prompt || '');
   const [draftPromptParts, setDraftPromptParts] = useState(data.promptParts);
   const [quickTweak, setQuickTweak] = useState('');
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const [isGeneratingNext, setIsGeneratingNext] = useState(false);
+  const [isRegeneratingNext, setIsRegeneratingNext] = useState(false);
   const [, setRunTick] = useState(0);
 
   useEffect(() => {
@@ -122,6 +139,18 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
     data.status === 'running' ? formatDuration(runningDurationMs) : formatDuration(data.lastRunDurationMs);
 
   const tags = useMemo(() => (Array.isArray(data.tags) ? data.tags.filter(Boolean) : []), [data.tags]);
+
+  const collapsedHiddenCount = Number((data as any)?.__collapsedHiddenCount || 0) || 0;
+  const collapsedPreview = ((data as any)?.__collapsedPreview || []) as Array<{
+    nodeId: string;
+    imageId: string;
+    url: string;
+  }>;
+  const collapsedPreviewTotal = Number((data as any)?.__collapsedPreviewTotal || collapsedPreview.length) || 0;
+
+  const generateDirection = prefs.canvasGenerateDirection === 'right' ? 'right' : 'down';
+  const targetHandlePosition = generateDirection === 'right' ? Position.Left : Position.Top;
+  const sourceHandlePosition = generateDirection === 'right' ? Position.Right : Position.Bottom;
 
   const parentLabel = useMemo(() => {
     if (!parentId) return '';
@@ -180,11 +209,14 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         : "border-border hover:border-border/80",
       data.favorite && "ring-1 ring-yellow-400/30"
     )}>
-      {/* 左侧连接点 */}
+      {/* 连接点 */}
       <Handle 
         type="target" 
-        position={Position.Left} 
-        className="!w-3 !h-3 !bg-primary !border-2 !border-card !-left-1.5"
+        position={targetHandlePosition} 
+        className={cn(
+          "!w-3 !h-3 !bg-primary !border-2 !border-card",
+          generateDirection === 'right' ? "!-left-1.5" : "!-top-1.5"
+        )}
       />
 
       {/* 顶部状态栏 - 更紧凑 */}
@@ -236,19 +268,32 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         <div className="flex items-center gap-2">
           {durationLabel ? <span className="opacity-60">{durationLabel}</span> : null}
           {childCount > 0 ? (
-            <button
-              className="inline-flex items-center gap-1 hover:text-foreground transition-colors bg-secondary px-1.5 py-0.5 rounded"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!firstChildId) return;
-                setSelectedNodeId(firstChildId);
-                focusNode(firstChildId);
-              }}
-              title="跳转到子节点"
-            >
-              <GitBranch className="w-3 h-3" />
-              <span>{childCount}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="inline-flex items-center hover:text-foreground transition-colors bg-secondary px-1 py-0.5 rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateNodeData(data.id, { collapsed: !data.collapsed });
+                }}
+                title={data.collapsed ? '展开子树' : '收起子树'}
+              >
+                {data.collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+              <button
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors bg-secondary px-1.5 py-0.5 rounded"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!firstChildId) return;
+                  if (data.collapsed) updateNodeData(data.id, { collapsed: false });
+                  setSelectedNodeId(firstChildId);
+                  focusNode(firstChildId);
+                }}
+                title="跳转到子节点"
+              >
+                <GitBranch className="w-3 h-3" />
+                <span>{childCount}</span>
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
@@ -282,10 +327,8 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   commitNodeEdit(data.id, { prompt: nextPrompt, promptParts: nextParts }, { source: 'manual' });
                   setIsEditing(false);
 
-                  const newId = branchNode(data.id, { prompt: nextPrompt, promptParts: nextParts });
-                  if (!newId) return;
-                  focusNode(newId);
-                  await generateNode(newId);
+                  const newIds = await generateFromNode(data.id, { mode: 'append' });
+                  if (newIds?.[0]) focusNode(newIds[0]);
                 }}
               >
                 保存并生成
@@ -402,10 +445,11 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                     title="以此图为垫图继续生成"
                     onClick={async (e) => {
                       e.stopPropagation();
-                      const newId = await continueFromImage(data.id, img.id, undefined, {
-                        mode: continueFromImageMode,
-                        historyNodes: continueHistoryNodes,
-                      });
+                      const newId =
+                        (await generateFromNode(data.id, {
+                          mode: 'append',
+                          overrides: { generationBaseMode: 'image', referenceImageId: img.id },
+                        }))?.[0] || null;
                       if (newId) {
                         focusNode(newId);
                         toast.success('已创建图片分支');
@@ -475,6 +519,50 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             <span className="text-xs opacity-50 [.zoom-level-low_&]:hidden">点击生成</span>
           </div>
         )}
+
+        {data.collapsed && childCount > 0 ? (
+          <div className="mt-2 rounded-lg border border-border/60 bg-background/70 p-2 [.zoom-level-low_&]:hidden">
+            <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground mb-1">
+              <span className="truncate">已收起子树</span>
+              {collapsedHiddenCount > 0 ? <span className="shrink-0">隐藏 {collapsedHiddenCount}</span> : null}
+            </div>
+
+            {prefs.canvasCollapsedPreviewImages !== false ? (
+              collapsedPreview.length > 0 ? (
+                <div className="grid grid-cols-3 gap-1">
+                  {collapsedPreview.map((p, idx) => {
+                    const isLast = idx === collapsedPreview.length - 1;
+                    const more = Math.max(0, collapsedPreviewTotal - collapsedPreview.length);
+                    return (
+                      <button
+                        key={`${p.imageId}_${p.nodeId}`}
+                        className="relative w-full aspect-square overflow-hidden rounded border border-border/40 bg-muted"
+                        title="展开并定位到该节点"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateNodeData(data.id, { collapsed: false });
+                          setSelectedNodeId(p.nodeId);
+                          focusNode(p.nodeId);
+                        }}
+                      >
+                        <img src={p.url} alt="" className="w-full h-full object-cover" />
+                        {isLast && more > 0 ? (
+                          <div className="absolute inset-0 bg-black/55 text-white text-xs font-semibold flex items-center justify-center">
+                            +{more}
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground/80">暂无可预览图片</div>
+              )
+            ) : (
+              <div className="text-[11px] text-muted-foreground/80">子树图片预览已关闭（可在设置中开启）</div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* 快速微调：从这里继续生成 - 核心交互，始终显示 */}
@@ -503,11 +591,14 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
 
               const basePrompt = String(data.prompt || '').trim();
               const nextPrompt = basePrompt ? `${basePrompt}, ${tweak}` : tweak;
-              const newId = branchNode(data.id, { prompt: nextPrompt, notes: tweak });
-              if (!newId) return;
               setQuickTweak('');
-              focusNode(newId);
-              void generateNode(newId);
+              void (async () => {
+                const newIds = await generateFromNode(data.id, {
+                  mode: 'append',
+                  overrides: { prompt: nextPrompt, notes: tweak },
+                });
+                if (newIds?.[0]) focusNode(newIds[0]);
+              })();
             }}
           />
           <Button
@@ -524,11 +615,14 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
               }
 
               const nextPrompt = tweak ? (basePrompt ? `${basePrompt}, ${tweak}` : tweak) : basePrompt;
-              const newId = branchNode(data.id, { prompt: nextPrompt, notes: tweak || undefined });
-              if (!newId) return;
               setQuickTweak('');
-              focusNode(newId);
-              void generateNode(newId);
+              void (async () => {
+                const newIds = await generateFromNode(data.id, {
+                  mode: 'append',
+                  overrides: { prompt: nextPrompt, notes: tweak || undefined },
+                });
+                if (newIds?.[0]) focusNode(newIds[0]);
+              })();
             }}
             title="从此继续生成新分支"
           >
@@ -601,51 +695,57 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <Button 
-            size="sm" 
-            variant="outline" 
+          <Button
+            size="sm"
+            variant="outline"
             className={cn(
               "h-7 px-2.5 text-xs border-border hover:bg-secondary hover:border-primary/30",
               "[.zoom-level-medium_&]:px-2"
             )}
-            title="从此节点继续生成（新分支）"
-            onClick={(e) => {
+            disabled={isGeneratingNext || isRegeneratingNext || data.status === 'running' || data.status === 'queued'}
+            title="重新生成（只保留最新一批）"
+            onClick={async (e) => {
               e.stopPropagation();
               if (!hasEffectivePromptContent(String(data.prompt || ''), data.promptParts)) {
                 toast.error('请先填写提示词');
                 return;
               }
-              const newId = branchNode(data.id);
-              if (!newId) return;
-              focusNode(newId);
-              void generateNode(newId);
+              setIsRegeneratingNext(true);
+              try {
+                const newIds = await generateFromNode(data.id, { mode: 'regenerate' });
+                if (newIds?.[0]) focusNode(newIds[0]);
+              } finally {
+                setIsRegeneratingNext(false);
+              }
             }}
           >
-            <GitBranch className="h-3 w-3 mr-1" />
-            继续
+            <RotateCcw className="h-3 w-3 mr-1" />
+            重新生成
           </Button>
-          <Button 
-            size="sm" 
+
+          <Button
+            size="sm"
             className={cn(
               "h-7 px-3 text-xs font-medium [.zoom-level-medium_&]:px-2",
-              data.status === 'running' || data.status === 'queued'
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-primary hover:bg-primary/90"
+              isGeneratingNext ? "bg-blue-600 hover:bg-blue-700" : "bg-primary hover:bg-primary/90"
             )}
-            disabled={data.status === 'running' || data.status === 'queued'}
-            onClick={(e) => {
+            disabled={isGeneratingNext || isRegeneratingNext || data.status === 'running' || data.status === 'queued'}
+            onClick={async (e) => {
               e.stopPropagation();
               if (!hasEffectivePromptContent(String(data.prompt || ''), data.promptParts)) {
                 toast.error('请先填写提示词');
                 return;
               }
-              const newId = branchNode(data.id);
-              if (!newId) return;
-              focusNode(newId);
-              void generateNode(newId);
+              setIsGeneratingNext(true);
+              try {
+                const newIds = await generateFromNode(data.id, { mode: 'append' });
+                if (newIds?.[0]) focusNode(newIds[0]);
+              } finally {
+                setIsGeneratingNext(false);
+              }
             }}
           >
-            {data.status === 'running' || data.status === 'queued' ? (
+            {isGeneratingNext ? (
               <>
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                 <span className="[.zoom-level-medium_&]:hidden">生成中</span>
@@ -653,18 +753,21 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             ) : (
               <>
                 <Play className="h-3 w-3 mr-1 fill-current" />
-                <span className="[.zoom-level-medium_&]:hidden">{data.status === 'failed' ? '重试' : '生成'}</span>
+                <span className="[.zoom-level-medium_&]:hidden">生成</span>
               </>
             )}
           </Button>
         </div>
       </div>
 
-      {/* 右侧连接点 */}
+      {/* 连接点 */}
       <Handle 
         type="source" 
-        position={Position.Right} 
-        className="!w-3 !h-3 !bg-primary !border-2 !border-card !-right-1.5"
+        position={sourceHandlePosition} 
+        className={cn(
+          "!w-3 !h-3 !bg-primary !border-2 !border-card",
+          generateDirection === 'right' ? "!-right-1.5" : "!-bottom-1.5"
+        )}
       />
     </div>
   );

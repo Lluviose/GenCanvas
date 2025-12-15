@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { hasEffectivePromptContent } from '@/lib/promptParts';
-import { BookMarked, Copy, GitBranch, Image as ImageIcon, Loader2, Play, Sparkles, Star, Trash2, Wand2, X, ArrowRight, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookMarked, Copy, GitBranch, Image as ImageIcon, Loader2, Play, RotateCcw, Sparkles, Star, Trash2, Wand2, X, ArrowRight, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PromptPartsEditor } from './PromptPartsEditor';
 import { AiChatDialog } from './AiChatDialog';
 
@@ -67,9 +67,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     duplicateNode,
     addNode,
     branchNode,
-    continueFromNode,
-    continueFromImage,
-    generateNode,
+    generateFromNode,
     generateNodes,
     toggleFavoriteNode,
     analyzeNodePrompt,
@@ -85,14 +83,16 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   const prefs = usePreferencesStore((s) => s.prefs);
   const updatePrefs = usePreferencesStore((s) => s.updatePrefs);
 
-  const selectedNodes = useMemo(() => nodes.filter((n) => n.selected), [nodes]);
+  const activeNodes = useMemo(() => nodes.filter((n) => !n.data.archived), [nodes]);
+  const selectedNodes = useMemo(() => activeNodes.filter((n) => n.selected), [activeNodes]);
   const effectiveSelectedNodeId = selectedNodeId || (selectedNodes.length === 1 ? selectedNodes[0].id : null);
-  const selectedNode = nodes.find((n) => n.id === effectiveSelectedNodeId) || null;
+  const selectedNode = activeNodes.find((n) => n.id === effectiveSelectedNodeId) || null;
   const nodeId = effectiveSelectedNodeId;
   const [formData, setFormData] = useState<Partial<NodeData>>({});
   const [tagsDraft, setTagsDraft] = useState('');
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [continuing, setContinuing] = useState(false);
   const [continuingFromImage, setContinuingFromImage] = useState(false);
   const [analyzingPrompt, setAnalyzingPrompt] = useState(false);
@@ -112,12 +112,12 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   const [librarySearch, setLibrarySearch] = useState('');
   const [activeLibraryTag, setActiveLibraryTag] = useState('');
 
-  const favoriteNodes = useMemo(() => nodes.filter((n) => n.data.favorite), [nodes]);
-  const failedNodesCount = useMemo(() => nodes.filter((n) => n.data.status === 'failed').length, [nodes]);
+  const favoriteNodes = useMemo(() => activeNodes.filter((n) => n.data.favorite), [activeNodes]);
+  const failedNodesCount = useMemo(() => activeNodes.filter((n) => n.data.status === 'failed').length, [activeNodes]);
 
   const topTags = useMemo(() => {
     const tagCounts = new Map<string, number>();
-    for (const n of nodes) {
+    for (const n of activeNodes) {
       for (const t of n.data.tags || []) {
         const k = String(t || '').trim();
         if (!k) continue;
@@ -128,12 +128,12 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 18)
       .map(([t]) => t);
-  }, [nodes]);
+  }, [activeNodes]);
 
   const filteredNodes = useMemo(() => {
     const q = canvasSearch.trim().toLowerCase();
     const activeTag = activeCanvasTag.trim();
-    const result = nodes.filter((n) => {
+    const result = activeNodes.filter((n) => {
       if (favoritesOnly && !n.data.favorite) return false;
       if (activeTag && !(n.data.tags || []).includes(activeTag)) return false;
       if (!q) return true;
@@ -146,7 +146,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
       return bt.localeCompare(at);
     });
     return result.slice(0, 60);
-  }, [nodes, canvasSearch, activeCanvasTag, favoritesOnly]);
+  }, [activeNodes, canvasSearch, activeCanvasTag, favoritesOnly]);
 
   const libraryTags = useMemo(() => {
     const counts = new Map<string, number>();
@@ -264,8 +264,12 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
 
   const childIds = useMemo(() => {
     if (!effectiveSelectedNodeId) return [];
-    return edges.filter((e) => e.source === effectiveSelectedNodeId).map((e) => e.target);
-  }, [edges, effectiveSelectedNodeId]);
+    const activeIds = new Set(activeNodes.map((n) => n.id));
+    return edges
+      .filter((e) => e.source === effectiveSelectedNodeId)
+      .map((e) => e.target)
+      .filter((id) => activeIds.has(id));
+  }, [edges, effectiveSelectedNodeId, activeNodes]);
 
   const revisions = selectedNode?.data.revisions || [];
   const isNodeBusy = Boolean(selectedNode && (selectedNode.data.status === 'running' || selectedNode.data.status === 'queued'));
@@ -281,6 +285,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     count: Math.max(1, Math.min(8, Number(formData.count || 1) || 1)),
     imageSize: (formData.imageSize || selectedNode?.data.imageSize || '2K') as NodeData['imageSize'],
     aspectRatio: (formData.aspectRatio || selectedNode?.data.aspectRatio || 'auto') as NodeData['aspectRatio'],
+    ...(formData.generationBaseMode !== undefined ? { generationBaseMode: formData.generationBaseMode } : {}),
     ...(formData.tags !== undefined ? { tags: formData.tags } : {}),
     ...(formData.notes !== undefined ? { notes: formData.notes } : {}),
   });
@@ -301,26 +306,28 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     try {
       const patch = buildEditablePatch();
       commitNodeEdit(nodeId, patch, { source: 'manual' });
-
-      const branchPatch: Partial<NodeData> = { ...patch };
-      delete (branchPatch as any).tags;
-      delete (branchPatch as any).notes;
-      const newId = branchNode(nodeId, branchPatch);
-      if (!newId) return;
-      onFocusNode?.(newId);
-      await generateNode(newId);
+      const newIds = await generateFromNode(nodeId, { mode: 'append' });
+      if (newIds?.[0]) onFocusNode?.(newIds[0]);
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleBranch = () => {
+  const handleRegenerate = async () => {
     if (!nodeId) return;
-    const patch = buildEditablePatch();
-    delete (patch as any).tags;
-    delete (patch as any).notes;
-    const newId = branchNode(nodeId, patch);
-    if (newId) onFocusNode?.(newId);
+    if (!hasEffectivePromptContent(String(formData.prompt || ''), formData.promptParts)) {
+      toast.error('请先填写提示词');
+      return;
+    }
+    setRegenerating(true);
+    try {
+      const patch = buildEditablePatch();
+      commitNodeEdit(nodeId, patch, { source: 'manual' });
+      const newIds = await generateFromNode(nodeId, { mode: 'regenerate' });
+      if (newIds?.[0]) onFocusNode?.(newIds[0]);
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   const handleContinue = async () => {
@@ -340,8 +347,8 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
 
     setContinuing(true);
     try {
-      const newId = await continueFromNode(nodeId, overrides);
-      if (newId) onFocusNode?.(newId);
+      const newIds = await generateFromNode(nodeId, { mode: 'append', overrides });
+      if (newIds?.[0]) onFocusNode?.(newIds[0]);
     } finally {
       setContinuing(false);
     }
@@ -391,11 +398,11 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
 
     setContinuingFromImage(true);
     try {
-      const newId = await continueFromImage(nodeId, activeImageId, overrides, {
-        mode: prefs.continueFromImageMode,
-        historyNodes: prefs.continueHistoryNodes,
+      const newIds = await generateFromNode(nodeId, {
+        mode: 'append',
+        overrides: { ...overrides, generationBaseMode: 'image', referenceImageId: activeImageId },
       });
-      if (newId) onFocusNode?.(newId);
+      if (newIds?.[0]) onFocusNode?.(newIds[0]);
     } finally {
       setContinuingFromImage(false);
     }
@@ -581,10 +588,8 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                         toast.error('请先填写提示词');
                         return;
                       }
-                      const newId = branchNode(node.id);
-                      if (!newId) return;
-                      onFocusNode?.(newId);
-                      await generateNode(newId);
+                      const newIds = await generateFromNode(node.id, { mode: 'append' });
+                      if (newIds?.[0]) onFocusNode?.(newIds[0]);
                     }}
                     title={disabled ? '该节点正在生成' : '生成该节点'}
                   >
@@ -1022,11 +1027,14 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     return;
                   }
                   const nextPrompt = `${basePrompt}, ${s.value}`;
-                  const newId = branchNode(nodeId, { prompt: nextPrompt, notes: s.label });
-                  if (newId) {
-                    onFocusNode?.(newId);
-                    void generateNode(newId);
-                  }
+                  if (!nodeId) return;
+                  void (async () => {
+                    const newIds = await generateFromNode(nodeId, {
+                      mode: 'append',
+                      overrides: { prompt: nextPrompt, notes: s.label },
+                    });
+                    if (newIds?.[0]) onFocusNode?.(newIds[0]);
+                  })();
                 }}
                 title={s.value}
               >
@@ -1051,12 +1059,14 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     return;
                   }
                   const nextPrompt = `${basePrompt}, ${customBranchInput.trim()}`;
-                  const newId = branchNode(nodeId, { prompt: nextPrompt, notes: customBranchInput.trim() });
-                  if (newId) {
-                    onFocusNode?.(newId);
-                    void generateNode(newId);
+                  void (async () => {
+                    const newIds = await generateFromNode(nodeId, {
+                      mode: 'append',
+                      overrides: { prompt: nextPrompt, notes: customBranchInput.trim() },
+                    });
+                    if (newIds?.[0]) onFocusNode?.(newIds[0]);
                     setCustomBranchInput('');
-                  }
+                  })();
                 }
               }}
             />
@@ -1073,12 +1083,14 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     return;
                   }
                   const nextPrompt = `${basePrompt}, ${customBranchInput.trim()}`;
-                  const newId = branchNode(nodeId, { prompt: nextPrompt, notes: customBranchInput.trim() });
-                  if (newId) {
-                    onFocusNode?.(newId);
-                    void generateNode(newId);
+                  void (async () => {
+                    const newIds = await generateFromNode(nodeId, {
+                      mode: 'append',
+                      overrides: { prompt: nextPrompt, notes: customBranchInput.trim() },
+                    });
+                    if (newIds?.[0]) onFocusNode?.(newIds[0]);
                     setCustomBranchInput('');
-                  }
+                  })();
                 }}
               >
                 分支
@@ -1148,6 +1160,25 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
           </div>
         </div>
 
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">继续模式</label>
+          <select
+            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+            value={String(formData.generationBaseMode || '')}
+            onChange={(e) => {
+              const v = String(e.target.value || '').trim();
+              handleChange('generationBaseMode', v === 'prompt' ? 'prompt' : v === 'image' ? 'image' : undefined);
+            }}
+          >
+            <option value="">默认（跟随设置）</option>
+            <option value="image">基于当前图</option>
+            <option value="prompt">纯提示词</option>
+          </select>
+          <div className="text-[11px] text-muted-foreground">
+            默认值可在设置中调整；也可以在单个节点上覆盖默认行为。
+          </div>
+        </div>
+
         {/* Version history */}
         <div className="rounded-lg border border-border bg-card p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
@@ -1211,10 +1242,8 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                               imageSize: rev.imageSize,
                               aspectRatio: rev.aspectRatio,
                             }));
-                            const newId = branchNode(nodeId);
-                            if (!newId) return;
-                            onFocusNode?.(newId);
-                            await generateNode(newId);
+                            const newIds = await generateFromNode(nodeId, { mode: 'append' });
+                            if (newIds?.[0]) onFocusNode?.(newIds[0]);
                           } finally {
                             setGenerating(false);
                           }
@@ -1253,7 +1282,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
             >
               <div className="text-[11px] text-muted-foreground mb-0.5">父节点</div>
               <div className="text-xs text-foreground/90 truncate">
-                {nodes.find((n) => n.id === parentId)?.data?.prompt || parentId}
+                {activeNodes.find((n) => n.id === parentId)?.data?.prompt || parentId}
               </div>
             </button>
           ) : (
@@ -1265,7 +1294,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
               <div className="text-[11px] text-muted-foreground">子节点 {childIds.length} 个</div>
               <div className="space-y-1">
                 {childIds.slice(0, 6).map((cid) => {
-                  const child = nodes.find((n) => n.id === cid);
+                  const child = activeNodes.find((n) => n.id === cid);
                   const label = child?.data?.prompt || cid;
                   const statusText = STATUS_LABEL[String(child?.data?.status || 'idle')] || String(child?.data?.status || 'idle');
                   return (
@@ -1300,7 +1329,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
           <Button variant="outline" onClick={handleSave}>
             保存修改
           </Button>
-          <Button onClick={handleGenerate} disabled={generating}>
+          <Button onClick={handleGenerate} disabled={generating || regenerating}>
             {generating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1309,13 +1338,22 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
             ) : (
               <>
                 <Play className="mr-2 h-4 w-4 fill-current" />
-                重新生成
+                生成
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={handleBranch}>
-            <GitBranch className="mr-2 h-4 w-4" />
-            创建分支
+          <Button variant="outline" onClick={handleRegenerate} disabled={generating || regenerating}>
+            {regenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                重新生成中…
+              </>
+            ) : (
+              <>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                重新生成
+              </>
+            )}
           </Button>
           <Button variant="outline" onClick={() => duplicateNode(nodeId)}>
             <Copy className="mr-2 h-4 w-4" />
@@ -1454,10 +1492,11 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                 onClick={async () => {
                   setContinuing(true);
                   try {
-                    const newId = await continueFromNode(nodeId, {
-                      prompt: promptSuggestion.suggestedPrompt,
-                    } as Partial<NodeData>);
-                    if (newId) onFocusNode?.(newId);
+                    const newIds = await generateFromNode(nodeId, {
+                      mode: 'append',
+                      overrides: { prompt: promptSuggestion.suggestedPrompt } as Partial<NodeData>,
+                    });
+                    if (newIds?.[0]) onFocusNode?.(newIds[0]);
                   } finally {
                     setContinuing(false);
                   }
@@ -1608,13 +1647,15 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     if (!nodeId || !activeImageId) return;
                     setContinuingFromImage(true);
                     try {
-                      const newId = await continueFromImage(
-                        nodeId,
-                        activeImageId,
-                        { prompt: imageSuggestion.suggestedPrompt } as Partial<NodeData>,
-                        { mode: prefs.continueFromImageMode, historyNodes: prefs.continueHistoryNodes }
-                      );
-                      if (newId) onFocusNode?.(newId);
+                      const newIds = await generateFromNode(nodeId, {
+                        mode: 'append',
+                        overrides: {
+                          prompt: imageSuggestion.suggestedPrompt,
+                          generationBaseMode: 'image',
+                          referenceImageId: activeImageId,
+                        } as Partial<NodeData>,
+                      });
+                      if (newIds?.[0]) onFocusNode?.(newIds[0]);
                     } finally {
                       setContinuingFromImage(false);
                     }

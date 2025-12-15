@@ -121,14 +121,21 @@ export default function AdminPage() {
     }
     setSavingKeys(true);
     try {
-      updateSettings({
-        apiKey: apiKeyInput.trim() || undefined,
-        openaiApiKey: openaiKeyInput.trim() || undefined,
-        analysis: {
+      // 只更新非空的 key，避免覆盖已有配置
+      const updates: Partial<typeof config> = {};
+      if (apiKeyInput.trim()) {
+        updates.apiKey = apiKeyInput.trim();
+      }
+      if (openaiKeyInput.trim()) {
+        updates.openaiApiKey = openaiKeyInput.trim();
+      }
+      if (analysisKeyInput.trim()) {
+        updates.analysis = {
           ...(config?.analysis || {}),
-          apiKey: analysisKeyInput.trim() || undefined,
-        },
-      });
+          apiKey: analysisKeyInput.trim(),
+        };
+      }
+      updateSettings(updates);
       toast.success('密钥已保存');
       setApiKeyInput('');
       setOpenaiKeyInput('');

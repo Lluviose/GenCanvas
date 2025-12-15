@@ -206,6 +206,10 @@ interface CanvasState {
     overrides?: Partial<NodeData>,
     options?: { mode?: 'image_only' | 'multi_turn'; historyNodes?: number }
   ) => Promise<string | null>;
+  generateFromNode: (
+    nodeId: string,
+    options?: { mode?: 'append' | 'regenerate'; overrides?: Partial<NodeData>; silent?: boolean; select?: boolean }
+  ) => Promise<string[] | null>;
   generateNodes: (ids: string[], options?: { concurrency?: number }) => Promise<void>;
   addImagesToGallery: (images: ImageMeta[]) => void;
   toggleFavoriteImage: (id: string) => void;
@@ -531,16 +535,43 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   branchNode: (id: string, overrides?: Partial<NodeData>) => {
-    const source = get().nodes.find((n) => n.id === id);
+    const snapshot = get();
+    const source = snapshot.nodes.find((n) => n.id === id);
     if (!source) return null;
 
-    const siblingCount = get().edges.filter((e) => e.source === id).length;
+    if (source.data.collapsed) {
+      set((prev) => ({
+        nodes: prev.nodes.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  collapsed: false,
+                },
+              }
+            : n
+        ),
+      }));
+    }
+
+    const prefs = getPreferences();
+    const direction = prefs.canvasGenerateDirection || 'down';
+
+    const nodesById = new Map(snapshot.nodes.map((n) => [n.id, n] as const));
+    const siblingCount = snapshot.edges
+      .filter((e) => e.source === id)
+      .map((e) => nodesById.get(e.target))
+      .filter(Boolean)
+      .filter((n) => !n!.data.archived).length;
     const newId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
-    const offsetPosition = {
-      x: source.position.x + 260,
-      y: source.position.y + 80 + siblingCount * 260,
-    };
+
+    const gap = 360;
+    const offsetPosition =
+      direction === 'right'
+        ? { x: source.position.x + gap, y: source.position.y + siblingCount * gap }
+        : { x: source.position.x + siblingCount * gap, y: source.position.y + gap };
 
     const newNode: AppNode = {
       ...source,
@@ -591,10 +622,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   continueFromNode: async (id: string, overrides?: Partial<NodeData>) => {
-    const newId = get().branchNode(id, overrides);
-    if (!newId) return null;
-    void get().generateNode(newId);
-    return newId;
+    const newIds = await get().generateFromNode(id, { mode: 'append', overrides });
+    return newIds?.[0] || null;
   },
 
   continueFromImage: async (
@@ -773,6 +802,378 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     void get().generateNode(newId, undefined, { inputImage });
     return newId;
+  },
+
+  generateFromNode: async (
+    nodeId: string,
+    options?: { mode?: 'append' | 'regenerate'; overrides?: Partial<NodeData>; silent?: boolean; select?: boolean }
+  ) => {
+    const state = get();
+    const base = state.nodes.find((n) => n.id === nodeId);
+    if (!base) return null;
+
+    if (base.data.collapsed) {
+      set((prev) => ({
+        nodes: prev.nodes.map((n) =>
+          n.id === nodeId
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  collapsed: false,
+                },
+              }
+            : n
+        ),
+      }));
+    }
+
+    const prefs = getPreferences();
+    const direction = prefs.canvasGenerateDirection || 'down';
+
+    const mergedData: NodeData = {
+      ...base.data,
+      ...(options?.overrides || {}),
+      count: Math.max(1, Math.min(8, Number(options?.overrides?.count ?? base.data.count) || 1)),
+      imageSize: (options?.overrides?.imageSize || base.data.imageSize || '2K') as NodeData['imageSize'],
+      aspectRatio: (options?.overrides?.aspectRatio || base.data.aspectRatio || 'auto') as NodeData['aspectRatio'],
+      modelName: state.workbenchHealth?.generation?.model || base.data.modelName || DEFAULT_MODEL_NAME,
+    };
+
+    if (!hasEffectivePromptContent(String(mergedData.prompt || ''), mergedData.promptParts)) {
+      if (!options?.silent) toast.error('请先填写提示词');
+      return null;
+    }
+
+    const baseMode = mergedData.generationBaseMode || prefs.defaultGenerationBaseMode;
+
+    const refCandidates = [
+      String(options?.overrides?.referenceImageId || '').trim(),
+      String(base.data.images?.[0]?.id || '').trim(),
+      String(base.data.referenceImageId || '').trim(),
+    ].filter(Boolean);
+
+    const uniqueRefCandidates = Array.from(new Set(refCandidates));
+
+    let resolvedReferenceImageId: string | undefined = undefined;
+    let inputImage: Base64Image | undefined = undefined;
+    if (baseMode === 'image' && uniqueRefCandidates.length > 0) {
+      for (const refId of uniqueRefCandidates) {
+        const refUrl =
+          state.galleryImages.find((img) => img.id === refId)?.url ||
+          state.nodes.flatMap((n) => n.data.images || []).find((img) => img.id === refId)?.url ||
+          '';
+        if (!refUrl) continue;
+        try {
+          inputImage = await toBase64ImageFromUrl(refUrl);
+          resolvedReferenceImageId = refId;
+          break;
+        } catch {
+          // try next
+        }
+      }
+      if (!inputImage && !options?.silent) {
+        toast.info('参考图片读取失败，已使用纯文本生成');
+      }
+    }
+
+    const mode = options?.mode || 'append';
+    if (mode === 'regenerate') {
+      const snapshot = get();
+      const nodesById = new Map(snapshot.nodes.map((n) => [n.id, n] as const));
+      const children = snapshot.edges.filter((e) => e.source === nodeId).map((e) => e.target);
+      const regenRoots = children
+        .map((id) => nodesById.get(id))
+        .filter(Boolean)
+        .filter((n) => n!.data.batchKind === 'regenerate' && !n!.data.archived)
+        .map((n) => n!.id);
+
+      if (regenRoots.length > 0) {
+        const nextArchived = new Set<string>();
+        const queue = [...regenRoots];
+        const edgesBySource = new Map<string, string[]>();
+        for (const e of snapshot.edges) {
+          if (!edgesBySource.has(e.source)) edgesBySource.set(e.source, []);
+          edgesBySource.get(e.source)!.push(e.target);
+        }
+
+        while (queue.length) {
+          const cur = queue.shift()!;
+          if (nextArchived.has(cur)) continue;
+          nextArchived.add(cur);
+          const kids = edgesBySource.get(cur) || [];
+          for (const k of kids) queue.push(k);
+        }
+
+        const now = new Date().toISOString();
+        set((prev) => ({
+          nodes: prev.nodes.map((n) =>
+            nextArchived.has(n.id)
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    archived: true,
+                    updatedAt: now,
+                  },
+                }
+              : n
+          ),
+        }));
+      }
+    }
+
+    const requestedCount = Math.max(1, Math.min(8, Number(mergedData.count) || 1));
+    const now = new Date().toISOString();
+    const startedAt = now;
+
+    const effectiveReferenceImageId = baseMode === 'image' && inputImage ? resolvedReferenceImageId : undefined;
+
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const batchKind = mode === 'regenerate' ? 'regenerate' : 'generate';
+
+    const snapshot = get();
+    const nodesById = new Map(snapshot.nodes.map((n) => [n.id, n] as const));
+    const existingVisibleChildren = snapshot.edges
+      .filter((e) => e.source === nodeId)
+      .map((e) => nodesById.get(e.target))
+      .filter(Boolean)
+      .filter((n) => !n!.data.archived).length;
+
+    const overrideTags = options?.overrides?.tags;
+    const overrideNotes = options?.overrides?.notes;
+    const nextTags = overrideTags !== undefined ? normalizeTags(overrideTags) : undefined;
+    const nextNotes =
+      overrideNotes !== undefined && String(overrideNotes || '').trim()
+        ? String(overrideNotes || '').trim()
+        : undefined;
+
+    const gap = 360;
+
+    const makeNodeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const newIds: string[] = [];
+    const newNodes: AppNode[] = [];
+    const newEdges: Edge[] = [];
+
+    for (let i = 0; i < requestedCount; i++) {
+      const newId = makeNodeId();
+      newIds.push(newId);
+
+      const position =
+        direction === 'right'
+          ? { x: base.position.x + gap, y: base.position.y + (existingVisibleChildren + i) * gap }
+          : { x: base.position.x + (existingVisibleChildren + i) * gap, y: base.position.y + gap };
+
+      const nodeNow: AppNode = {
+        ...base,
+        id: newId,
+        position,
+        data: {
+          ...base.data,
+          ...mergedData,
+          id: newId,
+          status: 'running',
+          createdAt: now,
+          updatedAt: now,
+          images: [],
+          favorite: false,
+          tags: nextTags,
+          notes: nextNotes,
+          revisions: undefined,
+          promptAnalysis: undefined,
+          imageAnalyses: undefined,
+          aiChats: undefined,
+          errorMessage: undefined,
+          lastRunAt: startedAt,
+          lastRunDurationMs: undefined,
+          referenceImageId: effectiveReferenceImageId,
+          batchId,
+          batchKind,
+          batchAttempt: i + 1,
+          archived: false,
+        },
+        selected: false,
+      };
+
+      const edgeId = `e_${nodeId}_${newId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      newEdges.push({ id: edgeId, source: nodeId, target: newId, type: 'smoothstep', animated: true });
+      newNodes.push(nodeNow);
+    }
+
+    const shouldSelectNew = options?.select !== false;
+    set((prev) => ({
+      nodes: shouldSelectNew
+        ? [...prev.nodes.map((n) => ({ ...n, selected: false })), ...newNodes.map((n, idx) => ({ ...n, selected: idx === 0 }))]
+        : [...prev.nodes, ...newNodes.map((n) => ({ ...n, selected: false }))],
+      edges: [...prev.edges, ...newEdges],
+      selectedNodeId: shouldSelectNew ? newIds[0] || prev.selectedNodeId : prev.selectedNodeId,
+    }));
+
+    const startAt = performance.now();
+
+    try {
+      const resp = await generateWorkbench({
+        prompt: mergedData.prompt,
+        promptParts: mergedData.promptParts,
+        count: requestedCount,
+        imageSize: mergedData.imageSize,
+        aspectRatio: mergedData.aspectRatio,
+        inputImage,
+      });
+
+      const duration = performance.now() - startAt;
+      const finishedAt = new Date().toISOString();
+
+      const requested = Number(resp.requestedCount ?? requestedCount) || requestedCount;
+      const partialErrors = resp.partialErrors || [];
+      const failedSet = new Set<number>(
+        partialErrors.map((e) => Number(e.attempt)).filter((n) => Number.isFinite(n) && n >= 1)
+      );
+
+      const images = resp.images || [];
+      const thoughtSigs = resp.imageThoughtSignatures || [];
+      const thoughtTexts = resp.imageTextParts || [];
+      const thoughtTextSigs = resp.imageTextThoughtSignatures || [];
+      let successCursor = 0;
+
+      const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const normalized: ImageMeta[] = [];
+      const nodePatches = new Map<string, Partial<NodeData>>();
+
+      for (let attempt = 1; attempt <= requested; attempt++) {
+        const idx = attempt - 1;
+        const targetNodeId = newIds[idx];
+        if (!targetNodeId) continue;
+
+        if (failedSet.has(attempt)) {
+          const msg =
+            partialErrors.find((e) => Number(e.attempt) === attempt)?.message ||
+            resp.error ||
+            resp.message ||
+            '生成失败';
+          nodePatches.set(targetNodeId, {
+            status: 'failed',
+            errorMessage: String(msg || '').trim() || '生成失败',
+            lastRunDurationMs: duration,
+            updatedAt: finishedAt,
+          });
+          continue;
+        }
+
+        const img = images[successCursor];
+        if (!img) {
+          nodePatches.set(targetNodeId, {
+            status: 'failed',
+            errorMessage: resp.error || 'No image generated',
+            lastRunDurationMs: duration,
+            updatedAt: finishedAt,
+          });
+          continue;
+        }
+
+        const imageId = `img_${targetNodeId}_${Date.now()}_0`;
+        const meta: ImageMeta = {
+          id: imageId,
+          nodeId: targetNodeId,
+          jobId,
+          url: toImageSrc(img),
+          createdAt: finishedAt,
+          isFavorite: false,
+          meta: {
+            prompt: mergedData.prompt,
+            model: mergedData.modelName,
+            imageSize: mergedData.imageSize,
+            aspectRatio: mergedData.aspectRatio,
+            referenceImageId: effectiveReferenceImageId,
+            batchId,
+            batchKind,
+            batchAttempt: attempt,
+            thoughtSignature: thoughtSigs?.[successCursor],
+            thoughtText: thoughtTexts?.[successCursor],
+            thoughtTextSignature: thoughtTextSigs?.[successCursor],
+          },
+        };
+
+        normalized.push(meta);
+        nodePatches.set(targetNodeId, {
+          status: 'completed',
+          images: [meta],
+          lastRunDurationMs: duration,
+          errorMessage: undefined,
+          updatedAt: finishedAt,
+        });
+
+        successCursor += 1;
+      }
+
+      set((prev) => ({
+        nodes: prev.nodes.map((n) => {
+          const patch = nodePatches.get(n.id);
+          if (!patch) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              ...patch,
+            },
+          };
+        }),
+        galleryImages: normalized.length > 0 ? [...normalized, ...prev.galleryImages] : prev.galleryImages,
+      }));
+
+      if (!options?.silent) {
+        const failed = Array.from(nodePatches.values()).filter((p) => p.status === 'failed').length;
+        if (failed > 0) {
+          toast.success(`图片生成完成（部分失败 ${failed}/${requested}），耗时 ${(duration / 1000).toFixed(1)} s`);
+        } else {
+          toast.success(`图片生成完成，耗时 ${(duration / 1000).toFixed(1)} s`);
+        }
+      }
+
+      const canAutoAnalyze = Boolean(get().workbenchHealth?.analysis?.hasApiKey);
+      const autoAnalyzeDefault = prefs.aiAutoAnalyzeAfterGenerate !== false;
+      const shouldAutoAnalyze = autoAnalyzeDefault && !options?.silent && canAutoAnalyze;
+
+      if (shouldAutoAnalyze && normalized.length > 0) {
+        void (async () => {
+          try {
+            for (const img of normalized) {
+              await get().analyzeNodePrompt(img.nodeId, { silent: true });
+              await get().analyzeNodeImage(img.nodeId, img.id, { silent: true });
+            }
+          } catch (error) {
+            console.warn('auto analyze after generate failed', error);
+          }
+        })();
+      }
+
+      return newIds;
+    } catch (error: any) {
+      console.error(error);
+      const duration = performance.now() - startAt;
+      const message = error?.message || '生成失败';
+      const finishedAt = new Date().toISOString();
+
+      set((prev) => ({
+        nodes: prev.nodes.map((n) =>
+          newIds.includes(n.id)
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  status: 'failed',
+                  lastRunDurationMs: duration,
+                  errorMessage: message,
+                  updatedAt: finishedAt,
+                },
+              }
+            : n
+        ),
+      }));
+
+      if (!options?.silent) toast.error(message);
+      return null;
+    }
   },
 
   addImagesToGallery: (images: ImageMeta[]) => {
@@ -1669,102 +2070,41 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }
 
     const concurrency = Math.max(1, Math.min(6, Number(options?.concurrency ?? 3) || 3));
-    const queuedAt = new Date().toISOString();
-
-    const siblingCounts = new Map<string, number>();
-    for (const e of snapshot.edges) {
-      siblingCounts.set(e.source, (siblingCounts.get(e.source) || 0) + 1);
-    }
-
-    const makeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const newIds: string[] = [];
-    const newNodes: AppNode[] = [];
-    const newEdges: Edge[] = [];
-
-    for (const baseId of runnableBases) {
-      const source = nodesById.get(baseId);
-      if (!source) continue;
-      const siblingCount = siblingCounts.get(baseId) || 0;
-      siblingCounts.set(baseId, siblingCount + 1);
-
-      const newId = makeId();
-      const offsetPosition = {
-        x: source.position.x + 260,
-        y: source.position.y + 80 + siblingCount * 260,
-      };
-
-      const newNode: AppNode = {
-        ...source,
-        id: newId,
-        position: offsetPosition,
-        data: {
-          ...source.data,
-          id: newId,
-          status: 'queued',
-          createdAt: queuedAt,
-          updatedAt: queuedAt,
-          images: [],
-          favorite: false,
-          tags: undefined,
-          notes: undefined,
-          revisions: undefined,
-          promptAnalysis: undefined,
-          imageAnalyses: undefined,
-          errorMessage: undefined,
-          lastRunAt: undefined,
-          lastRunDurationMs: undefined,
-        },
-        selected: true,
-      };
-
-      const edgeId = `e_${baseId}_${newId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      newEdges.push({
-        id: edgeId,
-        source: baseId,
-        target: newId,
-        type: 'smoothstep',
-        animated: true,
-      });
-
-      newIds.push(newId);
-      newNodes.push(newNode);
-    }
-
-    if (newIds.length === 0) {
-      if (skippedEmptyPrompt > 0) toast.error(`有 ${skippedEmptyPrompt} 个节点提示词为空`);
-      else toast.info('没有可生成的节点');
-      return;
-    }
-
-    set((state) => ({
-      nodes: [...state.nodes.map((n) => ({ ...n, selected: false })), ...newNodes.map((n) => ({ ...n, selected: true }))],
-      edges: [...state.edges, ...newEdges],
-      selectedNodeId: newIds[0] || state.selectedNodeId,
-    }));
-
     const startAt = performance.now();
-    const workerCount = Math.min(concurrency, newIds.length);
+    const workerCount = Math.min(concurrency, runnableBases.length);
 
     // 预先分配任务到各个 worker，避免并发竞态条件
     const taskQueues: string[][] = Array.from({ length: workerCount }, () => []);
-    newIds.forEach((id, idx) => {
+    runnableBases.forEach((id, idx) => {
       taskQueues[idx % workerCount].push(id);
     });
 
-    await Promise.all(
+    const results = await Promise.all(
       taskQueues.map(async (queue) => {
-        for (const nodeId of queue) {
-          await get().generateNode(nodeId, undefined, { silent: true, autoAnalyze: true });
+        const picked: string[] = [];
+        for (const baseId of queue) {
+          const newIds = await get().generateFromNode(baseId, { mode: 'append', silent: true, select: false });
+          if (newIds?.[0]) picked.push(newIds[0]);
         }
+        return picked;
       })
     );
 
     const elapsed = performance.now() - startAt;
     const finalById = new Map(get().nodes.map((n) => [n.id, n] as const));
 
-    const succeeded = newIds.filter((id) => finalById.get(id)?.data.status === 'completed').length;
-    const failed = newIds.filter((id) => finalById.get(id)?.data.status === 'failed').length;
-    const unknown = Math.max(0, newIds.length - succeeded - failed);
+    const pickedIds = results.flat().filter(Boolean);
+    if (pickedIds.length > 0) {
+      const pickedSet = new Set(pickedIds);
+      set((state) => ({
+        nodes: state.nodes.map((n) => ({ ...n, selected: pickedSet.has(n.id) })),
+        selectedNodeId: pickedIds[0] || state.selectedNodeId,
+      }));
+    }
+
+    const succeeded = pickedIds.filter((id) => finalById.get(id)?.data.status === 'completed').length;
+    const failed = pickedIds.filter((id) => finalById.get(id)?.data.status === 'failed').length;
+    const unknown = Math.max(0, pickedIds.length - succeeded - failed);
 
     const parts: string[] = [`成功 ${succeeded}`, `失败 ${failed}`];
     if (unknown > 0) parts.push(`未完成 ${unknown}`);

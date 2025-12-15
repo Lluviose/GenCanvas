@@ -3,6 +3,8 @@ import { create } from 'zustand';
 export type ImageSize = '1K' | '2K' | '4K';
 export type AspectRatio = 'auto' | string;
 export type ContinueFromImageMode = 'image_only' | 'multi_turn';
+export type CanvasGenerateDirection = 'down' | 'right';
+export type GenerationBaseMode = 'image' | 'prompt';
 
 export type QuickBranchPreset = {
   label: string;
@@ -22,6 +24,13 @@ export interface WorkbenchPreferences {
   quickBranchPresets: QuickBranchPreset[];
   continueFromImageMode: ContinueFromImageMode;
   continueHistoryNodes: number;
+
+  // Canvas
+  canvasGenerateDirection: CanvasGenerateDirection;
+  defaultGenerationBaseMode: GenerationBaseMode;
+  canvasCollapsedPreviewImages: boolean;
+  canvasCollapsedPreviewDepth: number;
+  canvasVisibleLatestLevels: number;
 
   // AI features
   aiAutoAnalyzeAfterGenerate: boolean;
@@ -54,6 +63,12 @@ const DEFAULT_PREFS: WorkbenchPreferences = {
   quickBranchPresets: DEFAULT_QUICK_BRANCH_PRESETS,
   continueFromImageMode: 'image_only',
   continueHistoryNodes: 6,
+
+  canvasGenerateDirection: 'down',
+  defaultGenerationBaseMode: 'image',
+  canvasCollapsedPreviewImages: true,
+  canvasCollapsedPreviewDepth: 3,
+  canvasVisibleLatestLevels: 0,
 
   aiAutoAnalyzeAfterGenerate: true,
   aiAutoTagPromptAssets: true,
@@ -106,6 +121,20 @@ const loadFromStorage = (): WorkbenchPreferences | null => {
       ? Math.max(1, Math.min(12, continueHistoryNodesRaw))
       : DEFAULT_PREFS.continueHistoryNodes;
 
+    const canvasGenerateDirection: CanvasGenerateDirection =
+      (parsed as any)?.canvasGenerateDirection === 'right' ? 'right' : 'down';
+    const defaultGenerationBaseMode: GenerationBaseMode =
+      (parsed as any)?.defaultGenerationBaseMode === 'prompt' ? 'prompt' : 'image';
+    const canvasCollapsedPreviewImages = (parsed as any)?.canvasCollapsedPreviewImages !== false;
+    const canvasCollapsedPreviewDepthRaw = Number((parsed as any)?.canvasCollapsedPreviewDepth);
+    const canvasCollapsedPreviewDepth = Number.isFinite(canvasCollapsedPreviewDepthRaw)
+      ? Math.max(1, Math.min(6, canvasCollapsedPreviewDepthRaw))
+      : DEFAULT_PREFS.canvasCollapsedPreviewDepth;
+    const canvasVisibleLatestLevelsRaw = Number((parsed as any)?.canvasVisibleLatestLevels);
+    const canvasVisibleLatestLevels = Number.isFinite(canvasVisibleLatestLevelsRaw)
+      ? Math.max(0, Math.min(50, canvasVisibleLatestLevelsRaw))
+      : DEFAULT_PREFS.canvasVisibleLatestLevels;
+
     const aiAutoAnalyzeAfterGenerate = (parsed as any)?.aiAutoAnalyzeAfterGenerate !== false;
     const aiAutoTagPromptAssets = (parsed as any)?.aiAutoTagPromptAssets !== false;
     const aiPromptHighQualityThresholdRaw = Number((parsed as any)?.aiPromptHighQualityThreshold);
@@ -146,6 +175,11 @@ const loadFromStorage = (): WorkbenchPreferences | null => {
       quickBranchPresets,
       continueFromImageMode,
       continueHistoryNodes,
+      canvasGenerateDirection,
+      defaultGenerationBaseMode,
+      canvasCollapsedPreviewImages,
+      canvasCollapsedPreviewDepth,
+      canvasVisibleLatestLevels,
       aiAutoAnalyzeAfterGenerate,
       aiAutoTagPromptAssets,
       aiPromptHighQualityThreshold,

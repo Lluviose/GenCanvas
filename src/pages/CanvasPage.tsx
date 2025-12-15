@@ -57,8 +57,8 @@ const defaultEdgeOptions = {
 function CanvasContent() {
   const { projectId = 'default', canvasId = 'default' } = useParams();
   const { 
-    nodes, 
-    edges, 
+    nodes: allNodes, 
+    edges: allEdges, 
     onNodesChange, 
     onEdgesChange, 
     onConnect, 
@@ -69,8 +69,7 @@ function CanvasContent() {
     galleryImages,
     removeNode,
     duplicateNode,
-    generateNode,
-    branchNode,
+    generateFromNode,
   } = useCanvasStore();
   const activeCanvasKey = useCanvasStore((s) => s.activeCanvasKey);
   const promptLibrary = useCanvasStore((s) => s.promptLibrary);
@@ -105,6 +104,159 @@ function CanvasContent() {
   };
   const ThemeIcon = theme === 'light' ? Sun : Moon;
 
+  type CollapsedPreviewItem = { nodeId: string; imageId: string; url: string };
+
+  const { nodes: nodes, edges: edges, visibleNodeIds } = useMemo(() => {
+    const nodesById = new Map<string, AppNode>();
+    const activeIds = new Set<string>();
+
+    for (const n of allNodes) {
+      nodesById.set(n.id, n);
+      if (!n.data.archived) activeIds.add(n.id);
+    }
+
+    const childrenById = new Map<string, string[]>();
+    const parentsById = new Map<string, string[]>();
+
+    for (const e of allEdges) {
+      if (!activeIds.has(e.source) || !activeIds.has(e.target)) continue;
+      const kids = childrenById.get(e.source);
+      if (kids) kids.push(e.target);
+      else childrenById.set(e.source, [e.target]);
+
+      const parents = parentsById.get(e.target);
+      if (parents) parents.push(e.source);
+      else parentsById.set(e.target, [e.source]);
+    }
+
+    const latestLevelsRaw = Number(prefs.canvasVisibleLatestLevels || 0);
+    const latestLevels = Number.isFinite(latestLevelsRaw) ? Math.max(0, Math.min(50, latestLevelsRaw)) : 0;
+
+    let tailVisibleIds: Set<string> = activeIds;
+    if (latestLevels > 0) {
+      const leaves = Array.from(activeIds).filter((id) => (childrenById.get(id) || []).length === 0);
+
+      if (leaves.length > 0) {
+        const dist = new Map<string, number>();
+        const queue = [...leaves];
+        for (const leaf of leaves) dist.set(leaf, 0);
+
+        for (let i = 0; i < queue.length; i++) {
+          const cur = queue[i]!;
+          const curDist = dist.get(cur)!;
+          const parents = parentsById.get(cur) || [];
+          for (const p of parents) {
+            const nextDist = curDist + 1;
+            const prev = dist.get(p);
+            if (prev === undefined || nextDist < prev) {
+              dist.set(p, nextDist);
+              queue.push(p);
+            }
+          }
+        }
+
+        tailVisibleIds = new Set(
+          Array.from(activeIds).filter((id) => {
+            const d = dist.get(id);
+            return d !== undefined && d < latestLevels;
+          })
+        );
+      }
+    }
+
+    const previewEnabled = prefs.canvasCollapsedPreviewImages !== false;
+    const previewDepthRaw = Number(prefs.canvasCollapsedPreviewDepth || 3);
+    const previewDepth = Number.isFinite(previewDepthRaw) ? Math.max(1, Math.min(6, previewDepthRaw)) : 3;
+    const previewLimit = 9;
+
+    const hiddenIds = new Set<string>();
+    const hiddenCountById = new Map<string, number>();
+    const previewById = new Map<string, CollapsedPreviewItem[]>();
+    const previewTotalById = new Map<string, number>();
+
+    const collapsedRoots = allNodes
+      .filter((n) => tailVisibleIds.has(n.id) && Boolean(n.data.collapsed) && !n.data.archived)
+      .map((n) => n.id);
+
+    for (const rootId of collapsedRoots) {
+      if (hiddenIds.has(rootId)) continue;
+
+      let hiddenCount = 0;
+      let previewTotal = 0;
+      const preview: CollapsedPreviewItem[] = [];
+      const queue: Array<{ id: string; depth: number }> = [];
+      const rootKids = childrenById.get(rootId) || [];
+      for (const k of rootKids) queue.push({ id: k, depth: 1 });
+
+      const seen = new Set<string>();
+
+      for (let qi = 0; qi < queue.length; qi++) {
+        const cur = queue[qi]!;
+        if (seen.has(cur.id)) continue;
+        seen.add(cur.id);
+
+        hiddenIds.add(cur.id);
+        hiddenCount += 1;
+
+        if (previewEnabled && cur.depth <= previewDepth) {
+          const node = nodesById.get(cur.id);
+          const img = node?.data.images?.[0];
+          if (img?.url) {
+            previewTotal += 1;
+            if (preview.length < previewLimit) {
+              preview.push({ nodeId: cur.id, imageId: img.id, url: img.url });
+            }
+          }
+        }
+
+        const kids = childrenById.get(cur.id) || [];
+        for (const k of kids) queue.push({ id: k, depth: cur.depth + 1 });
+      }
+
+      hiddenCountById.set(rootId, hiddenCount);
+      if (previewEnabled) {
+        previewById.set(rootId, preview);
+        previewTotalById.set(rootId, previewTotal);
+      }
+    }
+
+    const visibleNodeIds = new Set(Array.from(tailVisibleIds).filter((id) => !hiddenIds.has(id)));
+    const filteredNodes = allNodes.filter((n) => visibleNodeIds.has(n.id));
+    const filteredEdges = allEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target));
+
+    const nodesWithExtras = filteredNodes.map((n) => {
+      const hiddenCount = hiddenCountById.get(n.id);
+      const preview = previewById.get(n.id);
+      const previewTotal = previewTotalById.get(n.id);
+      if (hiddenCount === undefined && preview === undefined && previewTotal === undefined) return n;
+
+      return {
+        ...n,
+        data: {
+          ...(n.data as any),
+          __collapsedHiddenCount: hiddenCount ?? 0,
+          __collapsedPreview: preview,
+          __collapsedPreviewTotal: previewTotal ?? preview?.length ?? 0,
+        } as any,
+      };
+    });
+
+    return { nodes: nodesWithExtras, edges: filteredEdges, visibleNodeIds };
+  }, [
+    allNodes,
+    allEdges,
+    prefs.canvasVisibleLatestLevels,
+    prefs.canvasCollapsedPreviewImages,
+    prefs.canvasCollapsedPreviewDepth,
+  ]);
+
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    if (!visibleNodeIds.has(selectedNodeId)) {
+      setSelectedNodeId(null);
+    }
+  }, [selectedNodeId, visibleNodeIds, setSelectedNodeId]);
+
   // 统计信息
   const stats = useMemo(() => {
     const total = nodes.length;
@@ -134,7 +286,7 @@ function CanvasContent() {
     }
 
     const nodeId = generateId();
-    const baseNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null;
+    const baseNode = selectedNodeId ? allNodes.find((n) => n.id === selectedNodeId) : null;
     const newNode: AppNode = {
       id: nodeId,
       type: 'generationNode',
@@ -167,10 +319,12 @@ function CanvasContent() {
     prefs.defaultCount,
     prefs.defaultImageSize,
     selectedNodeId,
-    nodes,
+    allNodes,
   ]);
 
   const onDoubleClick = useCallback((event: React.MouseEvent) => {
+    // 移动设备上禁用双击新增节点
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) return;
     const target = event.target as HTMLElement | null;
     // 避免在节点上双击误触新增
     if (target && target.closest('.react-flow__node')) return;
@@ -210,7 +364,7 @@ function CanvasContent() {
         } else {
           const nodeId = generateId();
           const now = new Date().toISOString();
-          const offset = Math.min(560, Math.max(0, nodes.length) * 40);
+          const offset = Math.min(560, Math.max(0, allNodes.length) * 40);
 
           const newNode: AppNode = {
             id: nodeId,
@@ -239,15 +393,16 @@ function CanvasContent() {
           });
 
           if (payload?.autoGenerate) {
-            const newId = branchNode(nodeId);
-            if (newId) {
+            void (async () => {
+              const newIds = await generateFromNode(nodeId, { mode: 'append' });
+              const focusId = newIds?.[0];
+              if (!focusId) return;
               requestAnimationFrame(() => {
-                const target = getNode(newId);
+                const target = getNode(focusId);
                 if (!target) return;
                 fitView({ nodes: [target], padding: 0.35, duration: 350 });
               });
-              void generateNode(newId);
-            }
+            })();
           }
         }
       }
@@ -264,9 +419,9 @@ function CanvasContent() {
       if (!img) {
         toast.error('未找到要复用的图片');
       } else {
-        const nodeId = generateId();
-        const now = new Date().toISOString();
-        const offset = Math.min(560, Math.max(0, nodes.length) * 40) + 80;
+          const nodeId = generateId();
+          const now = new Date().toISOString();
+          const offset = Math.min(560, Math.max(0, allNodes.length) * 40) + 80;
 
         const promptFromMeta = String(img.meta?.prompt || '').trim();
         const promptFromCaption = String(img.aiCaption || '').trim();
@@ -305,15 +460,16 @@ function CanvasContent() {
           if (!prompt) {
             toast.error('该图片没有可用的提示词，请在节点内补充后再生成');
           } else {
-            const newId = branchNode(nodeId);
-            if (newId) {
+            void (async () => {
+              const newIds = await generateFromNode(nodeId, { mode: 'append' });
+              const focusId = newIds?.[0];
+              if (!focusId) return;
               requestAnimationFrame(() => {
-                const target = getNode(newId);
+                const target = getNode(focusId);
                 if (!target) return;
                 fitView({ nodes: [target], padding: 0.35, duration: 350 });
               });
-              void generateNode(newId);
-            }
+            })();
           }
         }
       }
@@ -324,7 +480,7 @@ function CanvasContent() {
     galleryImages,
     addNode,
     selectOnlyNode,
-    nodes.length,
+    allNodes.length,
     canvasId,
     prefs.defaultCount,
     prefs.defaultImageSize,
@@ -332,8 +488,7 @@ function CanvasContent() {
     modelName,
     fitView,
     getNode,
-    generateNode,
-    branchNode,
+    generateFromNode,
   ]);
 
   // 全局快捷键：Delete 删除节点，Ctrl/Cmd+D 复制，Ctrl/Cmd+Enter 生成
@@ -355,27 +510,28 @@ function CanvasContent() {
 
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        const node = nodes.find((n) => n.id === selectedNodeId) || null;
+        const node = allNodes.find((n) => n.id === selectedNodeId) || null;
         if (!node) return;
         if (!hasEffectivePromptContent(String(node.data.prompt || ''), node.data.promptParts)) {
           toast.error('请先填写提示词');
           return;
         }
-
-        const newId = branchNode(selectedNodeId);
-        if (!newId) return;
-        requestAnimationFrame(() => {
-          const target = getNode(newId);
-          if (!target) return;
-          fitView({ nodes: [target], padding: 0.35, duration: 350 });
-        });
-        void generateNode(newId);
+        void (async () => {
+          const newIds = await generateFromNode(selectedNodeId, { mode: 'append' });
+          const focusId = newIds?.[0];
+          if (!focusId) return;
+          requestAnimationFrame(() => {
+            const target = getNode(focusId);
+            if (!target) return;
+            fitView({ nodes: [target], padding: 0.35, duration: 350 });
+          });
+        })();
       }
     };
 
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [selectedNodeId, nodes, removeNode, setSelectedNodeId, duplicateNode, generateNode, branchNode, fitView, getNode]);
+  }, [selectedNodeId, allNodes, removeNode, setSelectedNodeId, duplicateNode, generateFromNode, fitView, getNode]);
 
   return (
     <div className="flex h-full w-full">

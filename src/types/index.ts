@@ -55,6 +55,12 @@ export interface NodeData {
   /** @deprecated 产品决策：不再支持负面提示词。请勿在新功能中使用。 */
   negativePrompt?: string;
   referenceImageId?: string;
+  generationBaseMode?: 'image' | 'prompt';
+  archived?: boolean;
+  collapsed?: boolean;
+  batchId?: string;
+  batchKind?: 'generate' | 'regenerate';
+  batchAttempt?: number;
 
   // Gemini image config
   count: number;

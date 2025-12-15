@@ -45,9 +45,23 @@ export default function SettingsPage() {
       return Math.max(6, Math.min(80, v));
     })();
 
+    const canvasCollapsedPreviewDepth = (() => {
+      const v = Number(draft.canvasCollapsedPreviewDepth);
+      if (!Number.isFinite(v)) return prefs.canvasCollapsedPreviewDepth;
+      return Math.max(1, Math.min(6, v));
+    })();
+
+    const canvasVisibleLatestLevels = (() => {
+      const v = Number(draft.canvasVisibleLatestLevels);
+      if (!Number.isFinite(v)) return prefs.canvasVisibleLatestLevels;
+      return Math.max(0, Math.min(50, v));
+    })();
+
     updatePrefs({
       ...draft,
       quickBranchPresets: cleanedQuickBranchPresets,
+      canvasCollapsedPreviewDepth,
+      canvasVisibleLatestLevels,
       aiPromptHighQualityThreshold: clampScore(draft.aiPromptHighQualityThreshold, prefs.aiPromptHighQualityThreshold),
       aiImageHighQualityThreshold: clampScore(draft.aiImageHighQualityThreshold, prefs.aiImageHighQualityThreshold),
       aiChatMaxMessages,
@@ -271,6 +285,80 @@ export default function SettingsPage() {
                 <option value="16:9">16:9</option>
                 <option value="9:16">9:16</option>
               </select>
+            </div>
+
+            <div className="pt-3 border-t border-border space-y-3">
+              <h4 className="text-sm font-semibold">画布</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">生成方向</label>
+                  <select
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={draft.canvasGenerateDirection}
+                    onChange={(e) =>
+                      handleChange('canvasGenerateDirection', e.target.value === 'right' ? 'right' : 'down')
+                    }
+                  >
+                    <option value="down">向下（横向排列）</option>
+                    <option value="right">向右（纵向排列）</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">默认继续模式</label>
+                  <select
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    value={draft.defaultGenerationBaseMode}
+                    onChange={(e) =>
+                      handleChange('defaultGenerationBaseMode', e.target.value === 'prompt' ? 'prompt' : 'image')
+                    }
+                  >
+                    <option value="image">基于图片</option>
+                    <option value="prompt">纯提示词</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={Boolean(draft.canvasCollapsedPreviewImages)}
+                      onChange={(e) => handleChange('canvasCollapsedPreviewImages', e.target.checked)}
+                    />
+                    收起子树时在父节点显示子树图片
+                  </label>
+                  <p className="text-xs text-muted-foreground">关闭可降低超大画布的渲染开销。</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">收起预览深度（默认 3 级）</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={Number(draft.canvasCollapsedPreviewDepth || 3)}
+                    onChange={(e) => handleChange('canvasCollapsedPreviewDepth', Number(e.target.value) || 1)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">仅显示最新 N 级（从叶子向上裁剪）</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={Number(draft.canvasVisibleLatestLevels || 0)}
+                  onChange={(e) => handleChange('canvasVisibleLatestLevels', Number(e.target.value) || 0)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  0 = 不限制；&gt;0 仅保留距离叶子最近的 N 级节点，用于超大量节点时的性能/视觉优化。
+                </p>
+              </div>
             </div>
 
             <div className="pt-2 border-t border-border">

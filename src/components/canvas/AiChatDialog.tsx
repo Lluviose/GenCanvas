@@ -29,7 +29,7 @@ export function AiChatDialog({ open, onOpenChange, nodeId, imageId, onFocusNode 
 
   const sendAiChatMessage = useCanvasStore((s) => s.sendAiChatMessage);
   const clearAiChat = useCanvasStore((s) => s.clearAiChat);
-  const continueFromImage = useCanvasStore((s) => s.continueFromImage);
+  const generateFromNode = useCanvasStore((s) => s.generateFromNode);
 
   const prefs = usePreferencesStore((s) => s.prefs);
 
@@ -250,20 +250,20 @@ export function AiChatDialog({ open, onOpenChange, nodeId, imageId, onFocusNode 
                     if (!node) return;
                     setGenerating(true);
                     try {
-                      const newId = await continueFromImage(
-                        nodeId,
-                        imageId,
-                        {
+                      const newIds = await generateFromNode(nodeId, {
+                        mode: 'append',
+                        overrides: {
                           prompt,
                           promptParts: undefined,
+                          generationBaseMode: 'image',
+                          referenceImageId: imageId,
                           count: node.data.count,
                           imageSize: node.data.imageSize,
                           aspectRatio: node.data.aspectRatio,
                         },
-                        { mode: prefs.continueFromImageMode, historyNodes: prefs.continueHistoryNodes }
-                      );
-                      if (newId) {
-                        onFocusNode?.(newId);
+                      });
+                      if (newIds?.[0]) {
+                        onFocusNode?.(newIds[0]);
                         onOpenChange(false);
                       }
                     } finally {
@@ -289,4 +289,3 @@ export function AiChatDialog({ open, onOpenChange, nodeId, imageId, onFocusNode 
     </Dialog>
   );
 }
-
