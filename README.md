@@ -10,6 +10,8 @@
 [![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?logo=vite)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss)](https://tailwindcss.com/)
 
+### 🌐 [在线体验 Demo](https://lluviose.github.io/GenCanvas/)
+
 [功能特性](#-功能特性) • [快速开始](#-快速开始) • [使用指南](#-使用指南) • [技术架构](#-技术架构) • [开发计划](#-开发计划)
 
 </div>
