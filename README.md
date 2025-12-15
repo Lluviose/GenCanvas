@@ -1,162 +1,275 @@
-# GenCanvas / 智绘画布（纯前端直连）
+<div align="center">
 
-一款面向「文生图创作」的**可视化工作台**：用画布/图谱把创作过程从线性历史升级为可分叉、可回溯、可整理的探索地图，帮助高频试错与迭代 Prompt，并将优质 Prompt 与图片沉淀为可复用资产。
+# 🎨 GenCanvas / 智绘画布
 
-本项目为 **Gemini 图像生成模型（默认 `gemini-3-pro-image-preview`）** 设计；提示词/图片的分析与打标签使用**另一个多模态模型**（同样走 Gemini 风格请求）。
+**面向 AI 文生图创作的可视化探索工作台**
 
-## 产品目标（对照）
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?logo=vite)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss)](https://tailwindcss.com/)
 
-- 把「生成试错过程」可视化：画布中直接看到分支与路线，不再是长历史列表。
-- 探索更快：并发生成 + 同屏快速比较。
-- 结果可继承：从任意节点继续生成，自然产生分支。
-- Prompt 变资产：可收藏、可标签化、可检索、可复用。
-- AI 辅助整理：自动打标签、评分/摘要（可选）。
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [使用指南](#-使用指南) • [技术架构](#-技术架构) • [开发计划](#-开发计划)
 
-## 核心概念
+</div>
 
-- **项目（Project）**：用于组织不同主题的创作图谱。
-- **画布（Canvas）**：一个主题/任务的创作空间（节点 + 连线构成的探索路径图）。
-- **节点（Node）**：一次尝试的最小单元：`prompt + 参数 + 生成结果 + 状态 + 迭代关系`。
-- **分支（Branch）**：从节点继续生成创建子节点并自动连线；用于探索方向变化（风格/构图/氛围等）。
-- **资产（Assets）**：全局图片库与提示词库，支持搜索/标签/收藏并回到工作台复用。
-- **版本历史（Revisions）**：同一节点内编辑提示词/参数会自动记录旧版本，可一键还原。
+---
 
-## 快速开始
+## 📖 项目简介
 
-环境：Node.js 18+
+GenCanvas 是一款将 AI 图像生成过程**可视化**的创作工具。它用**画布 + 节点图谱**的方式，把传统的线性历史升级为可分叉、可回溯、可整理的**探索地图**。
+
+**核心理念：** 在文生图创作中，Prompt 迭代需要大量试错。GenCanvas 让每一次尝试都成为可追溯的节点，让创作路径清晰可见，让优质方案沉淀为可复用资产。
+
+### 🎯 设计目标
+
+| 目标 | 说明 |
+|------|------|
+| **可视化探索** | 画布中直接看到分支与路线，告别冗长的历史列表 |
+| **高效迭代** | 并发生成 + 同屏快速对比，加速探索效率 |
+| **结果继承** | 从任意节点/图片继续生成，自然产生分支树 |
+| **资产沉淀** | 优质 Prompt 与图片可收藏、标签化、检索、复用 |
+| **AI 辅助** | 自动打标签、评分、摘要，智能整理创作资产 |
+
+---
+
+## ✨ 功能特性
+
+### 🖼️ 画布与节点
+
+- **多画布管理**：支持新建、重命名、复制、删除画布
+- **可视化节点图**：节点间连线展示父子关系与迭代路径
+- **节点状态追踪**：空闲/排队/生成中/完成/失败状态一目了然
+- **版本历史**：同节点内编辑自动记录历史版本，支持一键还原
+
+### 🔀 分支与迭代
+
+- **一键继续**：从任意节点创建子节点并立即生成
+- **快速微调**：输入变化词（如"插画风/特写/雨夜"）回车即分叉
+- **批量分叉**：多行输入批量创建分支，支持并发生成
+- **图片分支**：基于某张生成结果继续探索（支持多轮对话模式）
+
+### 📦 资产管理
+
+- **图片库**：全局收藏、标签、评分、搜索、排序
+- **提示词库**：保存优质 Prompt，支持标签化与复用
+- **一键复用**：从资产库发送到画布创建新节点继续探索
+
+### 🤖 AI 增强
+
+- **结构化提示词**：支持在文字中插入参考图并添加标注
+- **自动分析**：生成后自动分析提示词/图片，产出标签与评分
+- **AI 对话**：对生成图片开启对话模式，获取改进建议
+- **智能标签**：AI 自动为资产打标签，提升检索效率
+
+### 💾 数据与备份
+
+- **本地存储**：数据保存在浏览器 localStorage，隐私安全
+- **本地导出**：导出为 JSON 文件，支持合并/替换导入
+- **WebDAV 云备份**：支持坚果云、Nextcloud 等云存储服务
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
+
+- **Node.js** 18.0+
+- **npm** 或 **pnpm**
+
+### 安装与运行
 
 ```bash
+# 克隆仓库
+git clone https://github.com/Lluviose/GenCanvas.git
+cd GenCanvas
+
+# 安装依赖
 npm install
-```
 
-开发（Vite）：
-
-```bash
+# 启动开发服务器
 npm run dev
 ```
 
-本地预览（先构建，再预览 `dist/`）：
+访问 `http://localhost:34567` 开始使用。
+
+### 生产构建
 
 ```bash
+# 构建
 npm run build
+
+# 预览
 npm start
 ```
 
-访问：
+### 配置 API
 
-- 工作台：`http://localhost:34567/`（会重定向到 `/workbench`）
-- 项目：`http://localhost:34567/projects`
-- 画布列表：`http://localhost:34567/projects/:projectId/canvases`
-- 资产库：`http://localhost:34567/gallery`
-- API 配置：`http://localhost:34567/admin`
+1. 访问 `/admin` 页面
+2. 填写 Gemini API Key（或 OpenAI 兼容接口）
+3. 可选：配置独立的分析模型 Key（用于 AI 标签/评分）
 
-## 关键使用流程（业务流程）
+> ⚠️ **安全提示**：API Key 仅保存在本地浏览器，不会上传到任何服务器。
 
-1. **进入工作台**：`/workbench` 会自动打开“上次画布”，否则进入第一个项目的默认画布。
-2. **进入画布列表**：在 `/projects` 选择项目进入 `/projects/:projectId/canvases`，可新建/复制/重命名画布。
-3. **在画布创建节点**：双击空白处创建节点（默认继承当前选中节点的 prompt 与参数）。
-4. **生成与分支**：
-   - 节点卡片「生成」：在当前节点生成图片。
-   - 节点卡片「继续」：一键创建子节点并立即生成（轻量分叉）。
-   - 节点卡片「快速微调」：输入一行变化（如“插画风/特写/雨夜”）回车分叉并生成。
-   - 右侧详情「批量分叉」：每行一个变化，批量创建分支并可并发生成。
-   - 提示词输入框支持在文字中**插入参考图**（点击输入框右侧 `+`），并可点击图片添加**文字标注**。
-5. **对比**：框选/多选多个节点，右侧进入“对比视图”，可批量生成并横向看缩略图。
-6. **沉淀与找回**：
-   - 收藏图片（星标）进入全局图片库。
-   - 收藏节点会同步沉淀到提示词库（可搜索/标签化/再复用）。
-   - 资产库中可一键把「提示词」或「图片（作为参考图）」发送回工作台创建新节点继续探索。
+---
 
-## 配置与模型
+## 📚 使用指南
 
-- API 配置页：`/admin`
-  - 生成：Gemini 原生（`generativelanguage.googleapis.com`）或 OpenAI 兼容（`/v1/chat/completions`）
-  - 分析：可独立配置分析模型与 Key（用于 Prompt/图片分析与标签化）
+### 核心概念
 
-说明：
+| 概念 | 说明 |
+|------|------|
+| **项目 (Project)** | 用于组织不同主题的创作图谱 |
+| **画布 (Canvas)** | 一个主题/任务的创作空间，由节点+连线构成 |
+| **节点 (Node)** | 一次尝试的最小单元：Prompt + 参数 + 结果 + 状态 |
+| **分支 (Branch)** | 从节点继续生成创建的子节点，用于探索方向变化 |
+| **资产 (Assets)** | 全局图片库与提示词库，可搜索/标签/收藏/复用 |
 
-- 本项目已改为**纯前端直连外部 API**，API Key **仅保存在本地浏览器**（`localStorage`）。
-- 若你在公司/学校网络或某些浏览器环境下遇到请求失败，常见原因是 **CORS 限制**：部分第三方接口不允许从浏览器直接调用。
+### 典型工作流
 
-## 数据持久化（当前）
+```
+1. 创建节点 → 2. 编写 Prompt → 3. 生成图片 → 4. 评估结果
+                                              ↓
+     ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←← 满意？→ 收藏到资产库
+                                              ↓ 不满意
+                                         5. 分支继续
+                                              ↓
+                                    调整 Prompt/风格/构图
+                                              ↓
+                                         返回步骤 3
+```
 
-当前为本地单机 MVP：数据保存在浏览器 `localStorage`。
+### 页面导航
 
-- 画布列表：`photopro:canvases:<projectId>`
-- 画布快照：`photopro:canvas-state:<projectId>:<canvasId>`（nodes/edges）
-- 全局图片库：`photopro:gallery-images`
-- 提示词资产库：`photopro:prompt-library`
-- 项目列表：`photopro:projects`
-- 工作台 API 配置：`photopro:workbench-settings`
-- 工作台偏好与 AI 特性：`photopro:workbench-preferences`
-- WebDAV 配置：`photopro:webdav-config`
+| 路径 | 功能 |
+|------|------|
+| `/` | 自动重定向到上次画布 |
+| `/projects` | 项目列表 |
+| `/projects/:id/canvases` | 画布列表 |
+| `/projects/:id/canvases/:canvasId` | 画布工作台 |
+| `/gallery` | 资产库（图片 + 提示词） |
+| `/admin` | API 配置 |
+| `/settings` | 偏好设置 |
+| `/backup` | 数据备份 |
 
-## 数据备份
+---
 
-支持两种备份方式（`/backup` 页面）：
+## 🛠️ 技术架构
 
-### 本地导出/导入
-- 导出图片库、提示词库、项目、画布为 JSON 文件
-- 导入时可选择“合并”或“替换”模式
+### 技术栈
 
-### WebDAV 云备份
-- 支持坚果云、Nextcloud 等 WebDAV 服务
-- 坚果云配置示例：
-  - 服务器：`https://dav.jianguoyun.com/dav`
-  - 用户名：你的邮箱
-  - 密码：应用密码（在 账户设置 → 安全选项 → 第三方应用管理 创建）
+| 类别 | 技术 |
+|------|------|
+| **框架** | React 18 + TypeScript 5 |
+| **构建** | Vite 5 |
+| **状态管理** | Zustand |
+| **画布渲染** | ReactFlow |
+| **样式** | Tailwind CSS |
+| **图标** | Lucide React |
+| **HTTP** | Axios + Fetch API |
 
-## API 调用方式
+### 目录结构
 
-本项目不再提供 `/api/*` 后端代理。
+```
+src/
+├── components/          # 组件
+│   ├── canvas/          # 画布相关组件
+│   │   ├── CustomNode.tsx      # 节点卡片
+│   │   ├── Sidebar.tsx         # 右侧详情栏
+│   │   ├── PromptPartsEditor.tsx  # 结构化提示词编辑器
+│   │   └── AiChatDialog.tsx    # AI 对话弹窗
+│   └── ui/              # 通用 UI 组件
+├── pages/               # 页面
+│   ├── CanvasPage.tsx   # 画布工作台
+│   ├── GalleryPage.tsx  # 资产库
+│   ├── SettingsPage.tsx # 设置
+│   └── ...
+├── store/               # 状态管理
+│   ├── canvasStore.ts   # 画布/节点/资产状态
+│   ├── workbenchSettingsStore.ts  # API 配置
+│   └── preferencesStore.ts  # 用户偏好
+├── services/            # API 服务
+│   ├── workbenchApi.ts  # Gemini/OpenAI 接口
+│   └── backupService.ts # 备份服务
+├── types/               # 类型定义
+└── lib/                 # 工具函数
+```
 
-- 生成/分析接口在浏览器中直接请求 Gemini/OpenAI
-- API Key 由用户自行在 `/admin`（API 配置）填写并保存到本地
+### 数据存储
 
-## 开源发布到 GitHub
+所有数据保存在浏览器 `localStorage`：
 
-- 已提供 `LICENSE`（MIT）与 `.gitignore`（忽略 `node_modules/`、`dist/`、`.env*`）。
-- 参考资料（如 `gemini api文档和api参考.md`、`生图前端4.9-修改版.html`）默认已被 `.gitignore` 排除；如需公开发布，请先确认版权/授权允许分发。
-- 不要把任何 API Key 写入仓库（本项目默认只把 Key 保存在浏览器 `localStorage`）。
+| Key | 内容 |
+|-----|------|
+| `photopro:canvas-state:*` | 画布快照（节点/连线） |
+| `photopro:gallery-images` | 全局图片库 |
+| `photopro:prompt-library` | 提示词资产库 |
+| `photopro:workbench-settings` | API 配置 |
+| `photopro:workbench-preferences` | 用户偏好 |
 
-## 代码结构速览
+---
 
-- `src/pages/*`：页面（Projects/Canvases/Canvas/Gallery/Admin/Backup/Settings）
-- `src/components/canvas/*`：画布节点与右侧栏（节点卡片、对比/检索/分支操作）
-- `src/store/*`：Zustand 状态与业务逻辑（画布列表/节点/分支/并发生成/资产/版本历史）
-- `src/store/workbenchSettingsStore.ts`：工作台 API 配置（本地存储）
-- `src/services/workbenchApi.ts`：浏览器直连 Gemini/OpenAI 的请求封装
-- `src/services/backupService.ts`：本地导出/导入 + WebDAV 云备份
-- `src/types/*`：类型与数据结构（Node/Revision/Workbench API 等）
+## 🔧 配置说明
 
-## 当前已实现（相对设计目标）
+### API 配置（/admin）
 
-- 多画布管理：画布列表、新建、重命名、复制、删除（保留默认画布）。
-- 分叉与路线可视化：节点显示父/子关系与状态，支持跳转聚焦。
-- 轻量分叉：一键继续、快速微调回车继续、批量分叉并发生成。
-- 并发生成：多选节点批量生成（并发数可选），队列/运行状态可见。
-- 资产沉淀：图片库/提示词库（收藏、标签、搜索、排序、复用回工作台）。
-- AI 自动整理：生成后可自动分析提示词/图片，产出标签与评分（有 key 时）。
-- 结构化提示词：提示词内可插入参考图，支持点击图片添加标注，并随请求发送。
-- 继续生成增强：基于某张生成结果继续生成时，可选「仅发送该图」或「多轮对话（含历史节点）」模式。
-- AI 对话模式：对单张图片开启分析模型对话，一键预设提问，AI 回复可编辑并一键分叉生成。
-- 节点版本历史：同节点内编辑会自动记录旧版本，可一键还原/还原并生成。
-- 数据备份：本地导出/导入 + WebDAV 云备份（坚果云/Nextcloud）。
+**Gemini 模式（推荐）**
+- Base URL: `https://generativelanguage.googleapis.com`
+- Model: `gemini-3-pro-image-preview`
+- API Key: 你的 Gemini API Key
 
-## AI 特性（设置入口）
+**OpenAI 兼容模式**
+- 支持任何兼容 OpenAI API 的服务
+- 注意：图片生成功能仅 Gemini 模式支持
 
-- 设置页：`/settings` → **AI 特性**。
-  - 生成后自动分析：生成完成后自动跑提示词/图片分析并补全标签与评分（需要在 `/admin` 配置分析 Key）。
-  - 高质量阈值：资产库“只看高质量”使用该阈值过滤（图片/提示词分别配置）。
-  - AI 对话：支持是否携带历史、最多保留消息数、系统提示、以及“一键预设”管理。
-- 工作台侧边栏：在「生成结果」区域选择图片后可点 **AI对话**，或在「图片分析」里一键用建议创建分支/继续生成。
-- 多轮对话继续生成：会沿父子链路拼接 `contents` 发送历史；若历史图片带有 `thought_signature` 会优先用于上下文，否则会降级为 user 参考图。
+### WebDAV 备份配置
 
-## 不足与下一步（建议优先级）
+**坚果云示例：**
+- 服务器：`https://dav.jianguoyun.com/dav`
+- 用户名：你的邮箱
+- 密码：应用密码（在 账户设置 → 安全选项 → 第三方应用管理 创建）
 
-1. **进度与体验（高优）**：生成是同步请求，节点仅有状态无“第 N 张/总数”的细粒度进度；可考虑 SSE/流式或分批回写。
-2. **收藏体系还不完整（中优）**：节点收藏目前主要沉淀为“提示词资产”；缺少“精选库/合集”（把图片+节点打包成可复用方案）。
-3. **全局找回能力（中优）**：当前全局主要靠图片/提示词库；缺少跨画布的“节点级”全文检索与标签过滤。
-4. **分支表达（中优）**：目前用 `notes` 表达分支方向，后续可引入“分支命名/折叠/分组/对比视图增强”。
-#   G e n C a n v a s  
- 
+---
+
+## 📋 开发计划
+
+### ✅ 已完成
+
+- [x] 多画布管理与可视化节点图
+- [x] 分支与迭代工作流
+- [x] 图片库与提示词库
+- [x] AI 自动分析与标签
+- [x] 结构化提示词（图文混合）
+- [x] 多轮对话继续生成
+- [x] 版本历史与回滚
+- [x] 本地/WebDAV 备份
+
+### 🔜 计划中
+
+- [ ] **生成进度**：细粒度进度显示（第 N 张/总数）
+- [ ] **精选合集**：将图片+节点打包为可复用方案
+- [ ] **跨画布检索**：全局节点级全文搜索
+- [ ] **分支增强**：分支命名、折叠、分组
+
+---
+
+## 📄 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+<div align="center">
+
+**如果这个项目对你有帮助，请给一个 ⭐ Star！**
+
+Made with ❤️ by [Lluviose](https://github.com/Lluviose)
+
+</div>
