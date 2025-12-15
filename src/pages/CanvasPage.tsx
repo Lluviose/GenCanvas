@@ -16,6 +16,7 @@ import { useCanvasesStore } from '@/store/canvasesStore';
 import CustomNode from '@/components/canvas/CustomNode';
 import Sidebar from '@/components/canvas/Sidebar';
 import type { NodeData } from '@/types';
+import { hasEffectivePromptContent } from '@/lib/promptParts';
 import { Button } from '@/components/ui/button';
 import { 
   Plus, 
@@ -69,6 +70,7 @@ function CanvasContent() {
     removeNode,
     duplicateNode,
     generateNode,
+    branchNode,
   } = useCanvasStore();
   const activeCanvasKey = useCanvasStore((s) => s.activeCanvasKey);
   const promptLibrary = useCanvasStore((s) => s.promptLibrary);
@@ -83,7 +85,7 @@ function CanvasContent() {
     return canvasId;
   }, [canvases, canvasId]);
 
-  const { project, zoomIn, zoomOut, fitView } = useReactFlow();
+  const { project, zoomIn, zoomOut, fitView, getNode } = useReactFlow();
   const [isPanMode, setIsPanMode] = useState(false);
     const [zoomTier, setZoomTier] = useState<'high' | 'medium' | 'low'>('high');
 
@@ -335,13 +337,33 @@ function CanvasContent() {
 
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        await generateNode(selectedNodeId);
+        const node = nodes.find((n) => n.id === selectedNodeId) || null;
+        if (!node) return;
+        if (!hasEffectivePromptContent(String(node.data.prompt || ''), node.data.promptParts)) {
+          toast.error('请先填写提示词');
+          return;
+        }
+
+        const shouldBranch = node.data.status !== 'idle' || (node.data.images?.length || 0) > 0;
+        if (!shouldBranch) {
+          void generateNode(selectedNodeId);
+          return;
+        }
+
+        const newId = branchNode(selectedNodeId);
+        if (!newId) return;
+        requestAnimationFrame(() => {
+          const target = getNode(newId);
+          if (!target) return;
+          fitView({ nodes: [target], padding: 0.35, duration: 350 });
+        });
+        void generateNode(newId);
       }
     };
 
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [selectedNodeId, removeNode, setSelectedNodeId, duplicateNode, generateNode]);
+  }, [selectedNodeId, nodes, removeNode, setSelectedNodeId, duplicateNode, generateNode, branchNode, fitView, getNode]);
 
   return (
     <div className="flex h-full w-full">

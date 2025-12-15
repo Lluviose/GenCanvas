@@ -78,6 +78,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     applyPromptAssetToNode,
     clearSelection,
     selectOnlyNode,
+    clearFailedNodes,
   } = useCanvasStore();
 
   const quickBranchPresets = usePreferencesStore((s) => s.prefs.quickBranchPresets) || QUICK_BRANCH_SUGGESTIONS;
@@ -112,6 +113,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   const [activeLibraryTag, setActiveLibraryTag] = useState('');
 
   const favoriteNodes = useMemo(() => nodes.filter((n) => n.data.favorite), [nodes]);
+  const failedNodesCount = useMemo(() => nodes.filter((n) => n.data.status === 'failed').length, [nodes]);
 
   const topTags = useMemo(() => {
     const tagCounts = new Map<string, number>();
@@ -299,7 +301,20 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     try {
       const patch = buildEditablePatch();
       commitNodeEdit(nodeId, patch, { source: 'manual' });
-      await generateNode(nodeId, patch);
+
+      const shouldBranch = selectedNode?.data.status !== 'idle' || (selectedNode?.data.images?.length || 0) > 0;
+      if (!shouldBranch) {
+        await generateNode(nodeId, patch);
+        return;
+      }
+
+      const branchPatch: Partial<NodeData> = { ...patch };
+      delete (branchPatch as any).tags;
+      delete (branchPatch as any).notes;
+      const newId = branchNode(nodeId, branchPatch);
+      if (!newId) return;
+      onFocusNode?.(newId);
+      await generateNode(newId);
     } finally {
       setGenerating(false);
     }
@@ -568,7 +583,19 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     className="h-8"
                     disabled={disabled}
                     onClick={async () => {
-                      await generateNode(node.id);
+                      if (!hasEffectivePromptContent(String(node.data.prompt || ''), node.data.promptParts)) {
+                        toast.error('请先填写提示词');
+                        return;
+                      }
+                      const shouldBranch = node.data.status !== 'idle' || (node.data.images?.length || 0) > 0;
+                      if (!shouldBranch) {
+                        await generateNode(node.id);
+                        return;
+                      }
+                      const newId = branchNode(node.id);
+                      if (!newId) return;
+                      onFocusNode?.(newId);
+                      await generateNode(newId);
                     }}
                     title={disabled ? '该节点正在生成' : '生成该节点'}
                   >
@@ -589,8 +616,10 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                   </Button>
                 </div>
 
-                {node.data.status === 'failed' && node.data.errorMessage ? (
-                  <div className="text-xs text-red-300">{node.data.errorMessage}</div>
+                {node.data.errorMessage ? (
+                  <div className={cn('text-xs', node.data.status === 'failed' ? 'text-red-300' : 'text-amber-300')}>
+                    {node.data.errorMessage}
+                  </div>
                 ) : null}
               </div>
             );
@@ -657,11 +686,27 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     <Star className={cn('mr-2 h-4 w-4', favoritesOnly ? 'fill-yellow-400 text-yellow-400' : '')} />
                     只看收藏
                   </Button>
-                  {activeCanvasTag ? (
-                    <Button size="sm" variant="ghost" className="h-8" onClick={() => setActiveCanvasTag('')}>
-                      清除标签
-                    </Button>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {failedNodesCount > 0 ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => {
+                          if (!confirm(`确定清除 ${failedNodesCount} 个失败节点吗？`)) return;
+                          clearFailedNodes();
+                        }}
+                        title="一键清除生成失败的节点"
+                      >
+                        清除失败（{failedNodesCount}）
+                      </Button>
+                    ) : null}
+                    {activeCanvasTag ? (
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setActiveCanvasTag('')}>
+                        清除标签
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 {topTags.length ? (
                   <div className="flex flex-wrap gap-1.5">
@@ -914,6 +959,19 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {selectedNode.data.errorMessage ? (
+          <div
+            className={cn(
+              'rounded-lg border px-3 py-2 text-xs',
+              selectedNode.data.status === 'failed'
+                ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+            )}
+          >
+            {selectedNode.data.errorMessage}
+          </div>
+        ) : null}
+
         {/* Prompt */}
         <div className="space-y-2">
           <label className="text-sm font-medium">提示词</label>
@@ -1164,7 +1222,16 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                               imageSize: rev.imageSize,
                               aspectRatio: rev.aspectRatio,
                             }));
-                            await generateNode(nodeId);
+                            const shouldBranch =
+                              selectedNode?.data.status !== 'idle' || (selectedNode?.data.images?.length || 0) > 0;
+                            if (!shouldBranch) {
+                              await generateNode(nodeId);
+                              return;
+                            }
+                            const newId = branchNode(nodeId);
+                            if (!newId) return;
+                            onFocusNode?.(newId);
+                            await generateNode(newId);
                           } finally {
                             setGenerating(false);
                           }

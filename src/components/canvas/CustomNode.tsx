@@ -60,8 +60,9 @@ const statusConfig = {
 };
 
 const formatDuration = (ms?: number) => {
-  if (!ms) return '';
-  if (ms < 1000) return `${ms} ms`;
+  if (ms === undefined || ms === null) return '';
+  if (!Number.isFinite(ms)) return '';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
   return `${(ms / 1000).toFixed(1)} s`;
 };
 
@@ -93,6 +94,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
   const [draftPromptParts, setDraftPromptParts] = useState(data.promptParts);
   const [quickTweak, setQuickTweak] = useState('');
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const [, setRunTick] = useState(0);
 
   useEffect(() => {
     setDraftPrompt(data.prompt || '');
@@ -102,6 +104,22 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
   useEffect(() => {
     if (!selected) setQuickTweak('');
   }, [selected]);
+
+  useEffect(() => {
+    if (data.status !== 'running') return;
+    const t = window.setInterval(() => setRunTick((v) => v + 1), 250);
+    return () => window.clearInterval(t);
+  }, [data.status]);
+
+  const runningDurationMs = (() => {
+    if (data.status !== 'running') return undefined;
+    const startedAt = data.lastRunAt ? Date.parse(data.lastRunAt) : NaN;
+    if (!Number.isFinite(startedAt)) return undefined;
+    return Math.max(0, Date.now() - startedAt);
+  })();
+
+  const durationLabel =
+    data.status === 'running' ? formatDuration(runningDurationMs) : formatDuration(data.lastRunDurationMs);
 
   const tags = useMemo(() => (Array.isArray(data.tags) ? data.tags.filter(Boolean) : []), [data.tags]);
 
@@ -216,11 +234,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         )}
 
         <div className="flex items-center gap-2">
-          {(data.lastRunDurationMs || data.lastRunAt) && (
-            <span className="opacity-60">
-              {data.lastRunDurationMs ? formatDuration(data.lastRunDurationMs) : ''}
-            </span>
-          )}
+          {durationLabel ? <span className="opacity-60">{durationLabel}</span> : null}
           {childCount > 0 ? (
             <button
               className="inline-flex items-center gap-1 hover:text-foreground transition-colors bg-secondary px-1.5 py-0.5 rounded"
@@ -267,7 +281,17 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   }
                   commitNodeEdit(data.id, { prompt: nextPrompt, promptParts: nextParts }, { source: 'manual' });
                   setIsEditing(false);
-                  await generateNode(data.id, { prompt: nextPrompt, promptParts: nextParts });
+
+                  const shouldBranch = data.status !== 'idle' || (data.images?.length || 0) > 0;
+                  if (!shouldBranch) {
+                    await generateNode(data.id, { prompt: nextPrompt, promptParts: nextParts });
+                    return;
+                  }
+
+                  const newId = branchNode(data.id, { prompt: nextPrompt, promptParts: nextParts });
+                  if (!newId) return;
+                  focusNode(newId);
+                  await generateNode(newId);
                 }}
               >
                 保存并生成
@@ -332,11 +356,16 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         )}
       </div>
 
-      {data.status === 'failed' && data.errorMessage && (
-        <div className="px-4 pb-3 text-xs text-red-300 [.zoom-level-low_&]:hidden">
+      {data.errorMessage ? (
+        <div
+          className={cn(
+            "px-4 pb-3 text-xs [.zoom-level-low_&]:hidden",
+            data.status === 'failed' ? "text-red-300" : "text-amber-300"
+          )}
+        >
           {data.errorMessage}
         </div>
-      )}
+      ) : null}
 
       {/* 图片预览区域 - 更大的缩略图便于对比 */}
       <div className={cn("px-3 pb-2", "transition-all duration-300", "[.zoom-level-low_&]:p-1 [.zoom-level-low_&]:h-full")}>
@@ -588,9 +617,14 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             title="从此节点继续生成（新分支）"
             onClick={(e) => {
               e.stopPropagation();
-              const basePrompt = String(data.prompt || '').trim();
-              if (!basePrompt) {
+              if (!hasEffectivePromptContent(String(data.prompt || ''), data.promptParts)) {
                 toast.error('请先填写提示词');
+                return;
+              }
+              const shouldBranch = data.status !== 'idle' || (data.images?.length || 0) > 0;
+              if (!shouldBranch) {
+                setSelectedNodeId(data.id);
+                void generateNode(data.id);
                 return;
               }
               const newId = branchNode(data.id);
@@ -613,8 +647,14 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             disabled={data.status === 'running' || data.status === 'queued'}
             onClick={(e) => {
               e.stopPropagation();
-              setSelectedNodeId(data.id);
-              void generateNode(data.id);
+              if (!hasEffectivePromptContent(String(data.prompt || ''), data.promptParts)) {
+                toast.error('请先填写提示词');
+                return;
+              }
+              const newId = branchNode(data.id);
+              if (!newId) return;
+              focusNode(newId);
+              void generateNode(newId);
             }}
           >
             {data.status === 'running' || data.status === 'queued' ? (

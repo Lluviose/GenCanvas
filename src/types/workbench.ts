@@ -56,10 +56,19 @@ export interface WorkbenchGenerateRequest {
   inputImage?: Base64Image;
 }
 
+export type WorkbenchPartialError = {
+  attempt: number;
+  message: string;
+};
+
 export interface WorkbenchGenerateResponse {
   success: boolean;
   durationMs?: number;
   durationSeconds?: number;
+  requestedCount?: number;
+  succeededCount?: number;
+  failedCount?: number;
+  partialErrors?: WorkbenchPartialError[];
   images?: Base64Image[];
   imageThoughtSignatures?: Array<string | undefined>;
   /**

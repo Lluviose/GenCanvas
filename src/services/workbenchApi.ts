@@ -6,12 +6,38 @@ import type {
   WorkbenchChatResponse,
   WorkbenchGenerateRequest,
   WorkbenchGenerateResponse,
+  WorkbenchPartialError,
   WorkbenchHealth,
 } from '@/types/workbench';
 import type { Base64Image } from '@/types/media';
 import { getWorkbenchSettings } from '@/store/workbenchSettingsStore';
 
 const API_TIMEOUT_MS = 300_000;
+const GENERATION_MIN_INTERVAL_MS = 1000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+let generationStartLock: Promise<void> = Promise.resolve();
+let nextGenerationStartAt = 0;
+
+const scheduleGenerationStart = async (minIntervalMs = GENERATION_MIN_INTERVAL_MS) => {
+  let release!: () => void;
+  const lock = new Promise<void>((resolve) => (release = resolve));
+  const prev = generationStartLock;
+  generationStartLock = lock;
+  await prev;
+
+  let waitMs = 0;
+  try {
+    const now = Date.now();
+    waitMs = Math.max(0, nextGenerationStartAt - now);
+    nextGenerationStartAt = Math.max(nextGenerationStartAt, now) + minIntervalMs;
+  } finally {
+    release();
+  }
+
+  if (waitMs > 0) await sleep(waitMs);
+};
 
 const isOfficialGoogleEndpoint = (baseUrl: string) => {
   const host = String(baseUrl || '')
@@ -430,25 +456,44 @@ export const generateWorkbench = async (payload: WorkbenchGenerateRequest): Prom
   const imageTextParts: Array<string | undefined> = [];
   const imageTextThoughtSignatures: Array<string | undefined> = [];
   const texts: string[] = [];
+  const partialErrors: WorkbenchPartialError[] = [];
   for (let i = 0; i < count; i++) {
-    const resp = await callGeminiLike(s, requestBody);
-    const extracted = extractImagesFromResponse(resp);
-    images.push(...extracted.images);
-    imageThoughtSignatures.push(...(extracted.imageThoughtSignatures || []));
-    for (let j = 0; j < (extracted.images || []).length; j++) {
-      imageTextParts.push(extracted.signedTextPart?.text);
-      imageTextThoughtSignatures.push(extracted.signedTextPart?.thoughtSignature);
+    try {
+      await scheduleGenerationStart();
+      const resp = await callGeminiLike(s, requestBody);
+      const extracted = extractImagesFromResponse(resp);
+      texts.push(...extracted.texts);
+
+      if (!extracted.images.length) {
+        partialErrors.push({ attempt: i + 1, message: '本次请求未返回图片' });
+        continue;
+      }
+
+      images.push(...extracted.images);
+      imageThoughtSignatures.push(...(extracted.imageThoughtSignatures || []));
+      for (let j = 0; j < (extracted.images || []).length; j++) {
+        imageTextParts.push(extracted.signedTextPart?.text);
+        imageTextThoughtSignatures.push(extracted.signedTextPart?.thoughtSignature);
+      }
+    } catch (error: any) {
+      partialErrors.push({ attempt: i + 1, message: String(error?.message || error || '未知错误') });
     }
-    texts.push(...extracted.texts);
   }
 
-  if (!images.length) throw new Error('未能生成图片，请调整描述后重试');
+  if (!images.length) {
+    const first = partialErrors[0]?.message;
+    throw new Error(first || '未能生成图片，请调整描述后重试');
+  }
 
   const durationMs = Date.now() - startAt;
   return {
     success: true,
     durationMs,
     durationSeconds: Math.round(durationMs / 1000),
+    requestedCount: count,
+    succeededCount: Math.max(0, count - partialErrors.length),
+    failedCount: partialErrors.length,
+    partialErrors: partialErrors.length ? partialErrors : undefined,
     images,
     imageThoughtSignatures,
     imageTextParts,

@@ -196,6 +196,7 @@ interface CanvasState {
   clearSelection: () => void;
   selectOnlyNode: (id: string) => void;
   removeNode: (id: string) => void;
+  clearFailedNodes: () => void;
   duplicateNode: (id: string) => void;
   branchNode: (id: string, overrides?: Partial<NodeData>) => string | null;
   continueFromNode: (id: string, overrides?: Partial<NodeData>) => Promise<string | null>;
@@ -462,6 +463,35 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       edges: state.edges.filter((edge) => edge.source !== id && edge.target !== id),
       selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
     }));
+  },
+
+  clearFailedNodes: () => {
+    const failedIds = get()
+      .nodes.filter((n) => n.data.status === 'failed')
+      .map((n) => n.id);
+    if (failedIds.length === 0) {
+      toast.info('没有失败节点');
+      return;
+    }
+
+    const failedSet = new Set(failedIds);
+    set((state) => {
+      const remainingNodes = state.nodes.filter((n) => !failedSet.has(n.id));
+      const remainingEdges = state.edges.filter((e) => !failedSet.has(e.source) && !failedSet.has(e.target));
+
+      let nextSelectedId = state.selectedNodeId;
+      if (nextSelectedId && failedSet.has(nextSelectedId)) {
+        nextSelectedId = remainingNodes[0]?.id || null;
+      }
+
+      return {
+        nodes: remainingNodes.map((n) => ({ ...n, selected: nextSelectedId ? n.id === nextSelectedId : false })),
+        edges: remainingEdges,
+        selectedNodeId: nextSelectedId,
+      };
+    });
+
+    toast.success(`已清除失败节点 ${failedIds.length} 个`);
   },
 
   duplicateNode: (id: string) => {
@@ -1376,6 +1406,22 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         },
       }));
 
+      const partialErrors = resp.partialErrors || [];
+      const requestedCount = Number(resp.requestedCount ?? mergedData.count) || mergedData.count;
+      const failedCount = Number(resp.failedCount ?? partialErrors.length) || partialErrors.length;
+      let runErrorMessage: string | undefined = undefined;
+      if (partialErrors.length > 0) {
+        const details = partialErrors
+          .slice(0, 3)
+          .map((e) => `#${e.attempt} ${String(e.message || '').trim()}`)
+          .filter(Boolean)
+          .join('；');
+        const more = partialErrors.length > 3 ? `…(+${partialErrors.length - 3})` : '';
+        const summary = `部分失败：${failedCount}/${requestedCount}`;
+        runErrorMessage = details ? `${summary}。${details}${more}` : summary;
+        if (runErrorMessage.length > 240) runErrorMessage = `${runErrorMessage.slice(0, 240)}…`;
+      }
+
       const duration = performance.now() - startAt;
 
       set((prev) => ({
@@ -1389,7 +1435,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
                   status: 'completed',
                   images: normalized,
                   lastRunDurationMs: duration,
-                  errorMessage: undefined,
+                  errorMessage: runErrorMessage,
                   updatedAt: new Date().toISOString(),
                 },
               }
@@ -1398,7 +1444,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         galleryImages: [...normalized, ...prev.galleryImages],
       }));
 
-      if (!options?.silent) toast.success(`图片生成完成，耗时 ${(duration / 1000).toFixed(1)} s`);
+      if (!options?.silent) {
+        if (runErrorMessage) {
+          toast.success(`图片生成完成（部分失败 ${failedCount}/${requestedCount}），耗时 ${(duration / 1000).toFixed(1)} s`);
+        } else {
+          toast.success(`图片生成完成，耗时 ${(duration / 1000).toFixed(1)} s`);
+        }
+      }
 
       const canAutoAnalyze = Boolean(get().workbenchHealth?.analysis?.hasApiKey);
       const prefs = getPreferences();
