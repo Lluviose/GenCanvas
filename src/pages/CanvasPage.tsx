@@ -239,7 +239,15 @@ function CanvasContent() {
           });
 
           if (payload?.autoGenerate) {
-            void generateNode(nodeId);
+            const newId = branchNode(nodeId);
+            if (newId) {
+              requestAnimationFrame(() => {
+                const target = getNode(newId);
+                if (!target) return;
+                fitView({ nodes: [target], padding: 0.35, duration: 350 });
+              });
+              void generateNode(newId);
+            }
           }
         }
       }
@@ -297,7 +305,15 @@ function CanvasContent() {
           if (!prompt) {
             toast.error('该图片没有可用的提示词，请在节点内补充后再生成');
           } else {
-            void generateNode(nodeId);
+            const newId = branchNode(nodeId);
+            if (newId) {
+              requestAnimationFrame(() => {
+                const target = getNode(newId);
+                if (!target) return;
+                fitView({ nodes: [target], padding: 0.35, duration: 350 });
+              });
+              void generateNode(newId);
+            }
           }
         }
       }
@@ -315,7 +331,9 @@ function CanvasContent() {
     prefs.defaultAspectRatio,
     modelName,
     fitView,
+    getNode,
     generateNode,
+    branchNode,
   ]);
 
   // 全局快捷键：Delete 删除节点，Ctrl/Cmd+D 复制，Ctrl/Cmd+Enter 生成
@@ -341,12 +359,6 @@ function CanvasContent() {
         if (!node) return;
         if (!hasEffectivePromptContent(String(node.data.prompt || ''), node.data.promptParts)) {
           toast.error('请先填写提示词');
-          return;
-        }
-
-        const shouldBranch = node.data.status !== 'idle' || (node.data.images?.length || 0) > 0;
-        if (!shouldBranch) {
-          void generateNode(selectedNodeId);
           return;
         }
 

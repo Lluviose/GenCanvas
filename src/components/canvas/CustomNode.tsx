@@ -282,12 +282,6 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   commitNodeEdit(data.id, { prompt: nextPrompt, promptParts: nextParts }, { source: 'manual' });
                   setIsEditing(false);
 
-                  const shouldBranch = data.status !== 'idle' || (data.images?.length || 0) > 0;
-                  if (!shouldBranch) {
-                    await generateNode(data.id, { prompt: nextPrompt, promptParts: nextParts });
-                    return;
-                  }
-
                   const newId = branchNode(data.id, { prompt: nextPrompt, promptParts: nextParts });
                   if (!newId) return;
                   focusNode(newId);
@@ -619,12 +613,6 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
               e.stopPropagation();
               if (!hasEffectivePromptContent(String(data.prompt || ''), data.promptParts)) {
                 toast.error('请先填写提示词');
-                return;
-              }
-              const shouldBranch = data.status !== 'idle' || (data.images?.length || 0) > 0;
-              if (!shouldBranch) {
-                setSelectedNodeId(data.id);
-                void generateNode(data.id);
                 return;
               }
               const newId = branchNode(data.id);

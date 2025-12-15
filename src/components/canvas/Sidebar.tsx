@@ -302,12 +302,6 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
       const patch = buildEditablePatch();
       commitNodeEdit(nodeId, patch, { source: 'manual' });
 
-      const shouldBranch = selectedNode?.data.status !== 'idle' || (selectedNode?.data.images?.length || 0) > 0;
-      if (!shouldBranch) {
-        await generateNode(nodeId, patch);
-        return;
-      }
-
       const branchPatch: Partial<NodeData> = { ...patch };
       delete (branchPatch as any).tags;
       delete (branchPatch as any).notes;
@@ -585,11 +579,6 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     onClick={async () => {
                       if (!hasEffectivePromptContent(String(node.data.prompt || ''), node.data.promptParts)) {
                         toast.error('请先填写提示词');
-                        return;
-                      }
-                      const shouldBranch = node.data.status !== 'idle' || (node.data.images?.length || 0) > 0;
-                      if (!shouldBranch) {
-                        await generateNode(node.id);
                         return;
                       }
                       const newId = branchNode(node.id);
@@ -1222,12 +1211,6 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                               imageSize: rev.imageSize,
                               aspectRatio: rev.aspectRatio,
                             }));
-                            const shouldBranch =
-                              selectedNode?.data.status !== 'idle' || (selectedNode?.data.images?.length || 0) > 0;
-                            if (!shouldBranch) {
-                              await generateNode(nodeId);
-                              return;
-                            }
                             const newId = branchNode(nodeId);
                             if (!newId) return;
                             onFocusNode?.(newId);

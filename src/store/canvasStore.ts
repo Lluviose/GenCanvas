@@ -453,7 +453,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     );
 
     if (options?.autoGenerate) {
-      void get().generateNode(id);
+      void get().continueFromNode(id);
     }
   },
 
@@ -1645,8 +1645,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const snapshot = get();
     const nodesById = new Map(snapshot.nodes.map((n) => [n.id, n] as const));
 
-    const runnable: string[] = [];
-    let skippedRunning = 0;
+    const runnableBases: string[] = [];
     let skippedEmptyPrompt = 0;
     let skippedMissing = 0;
 
@@ -1660,45 +1659,95 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         skippedEmptyPrompt += 1;
         continue;
       }
-      if (node.data.status === 'running' || node.data.status === 'queued') {
-        skippedRunning += 1;
-        continue;
-      }
-      runnable.push(id);
+      runnableBases.push(id);
     }
 
-    if (runnable.length === 0) {
+    if (runnableBases.length === 0) {
       if (skippedEmptyPrompt > 0) toast.error(`有 ${skippedEmptyPrompt} 个节点提示词为空`);
       else toast.info('没有可生成的节点');
       return;
     }
 
     const concurrency = Math.max(1, Math.min(6, Number(options?.concurrency ?? 3) || 3));
-    const queueSet = new Set(runnable);
     const queuedAt = new Date().toISOString();
 
-    set((prev) => ({
-      nodes: prev.nodes.map((n) =>
-        queueSet.has(n.id)
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                status: 'queued',
-                errorMessage: undefined,
-                updatedAt: queuedAt,
-              },
-            }
-          : n
-      ),
+    const siblingCounts = new Map<string, number>();
+    for (const e of snapshot.edges) {
+      siblingCounts.set(e.source, (siblingCounts.get(e.source) || 0) + 1);
+    }
+
+    const makeId = () => `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const newIds: string[] = [];
+    const newNodes: AppNode[] = [];
+    const newEdges: Edge[] = [];
+
+    for (const baseId of runnableBases) {
+      const source = nodesById.get(baseId);
+      if (!source) continue;
+      const siblingCount = siblingCounts.get(baseId) || 0;
+      siblingCounts.set(baseId, siblingCount + 1);
+
+      const newId = makeId();
+      const offsetPosition = {
+        x: source.position.x + 260,
+        y: source.position.y + 80 + siblingCount * 260,
+      };
+
+      const newNode: AppNode = {
+        ...source,
+        id: newId,
+        position: offsetPosition,
+        data: {
+          ...source.data,
+          id: newId,
+          status: 'queued',
+          createdAt: queuedAt,
+          updatedAt: queuedAt,
+          images: [],
+          favorite: false,
+          tags: undefined,
+          notes: undefined,
+          revisions: undefined,
+          promptAnalysis: undefined,
+          imageAnalyses: undefined,
+          errorMessage: undefined,
+          lastRunAt: undefined,
+          lastRunDurationMs: undefined,
+        },
+        selected: true,
+      };
+
+      const edgeId = `e_${baseId}_${newId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      newEdges.push({
+        id: edgeId,
+        source: baseId,
+        target: newId,
+        type: 'smoothstep',
+        animated: true,
+      });
+
+      newIds.push(newId);
+      newNodes.push(newNode);
+    }
+
+    if (newIds.length === 0) {
+      if (skippedEmptyPrompt > 0) toast.error(`有 ${skippedEmptyPrompt} 个节点提示词为空`);
+      else toast.info('没有可生成的节点');
+      return;
+    }
+
+    set((state) => ({
+      nodes: [...state.nodes.map((n) => ({ ...n, selected: false })), ...newNodes.map((n) => ({ ...n, selected: true }))],
+      edges: [...state.edges, ...newEdges],
+      selectedNodeId: newIds[0] || state.selectedNodeId,
     }));
 
     const startAt = performance.now();
-    const workerCount = Math.min(concurrency, runnable.length);
+    const workerCount = Math.min(concurrency, newIds.length);
 
     // 预先分配任务到各个 worker，避免并发竞态条件
     const taskQueues: string[][] = Array.from({ length: workerCount }, () => []);
-    runnable.forEach((id, idx) => {
+    newIds.forEach((id, idx) => {
       taskQueues[idx % workerCount].push(id);
     });
 
@@ -1713,13 +1762,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const elapsed = performance.now() - startAt;
     const finalById = new Map(get().nodes.map((n) => [n.id, n] as const));
 
-    const succeeded = runnable.filter((id) => finalById.get(id)?.data.status === 'completed').length;
-    const failed = runnable.filter((id) => finalById.get(id)?.data.status === 'failed').length;
-    const unknown = Math.max(0, runnable.length - succeeded - failed);
+    const succeeded = newIds.filter((id) => finalById.get(id)?.data.status === 'completed').length;
+    const failed = newIds.filter((id) => finalById.get(id)?.data.status === 'failed').length;
+    const unknown = Math.max(0, newIds.length - succeeded - failed);
 
     const parts: string[] = [`成功 ${succeeded}`, `失败 ${failed}`];
     if (unknown > 0) parts.push(`未完成 ${unknown}`);
-    if (skippedRunning > 0) parts.push(`跳过(运行中) ${skippedRunning}`);
     if (skippedEmptyPrompt > 0) parts.push(`跳过(空提示词) ${skippedEmptyPrompt}`);
     if (skippedMissing > 0) parts.push(`跳过(缺失) ${skippedMissing}`);
 
