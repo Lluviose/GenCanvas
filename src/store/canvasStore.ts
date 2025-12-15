@@ -1464,7 +1464,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     contents.push({ role: 'user', parts: [{ text: messageText }] } as any);
 
-    const resp = await chatAnalyze({ contents, temperature: 0.4 });
+    let resp;
+    try {
+      resp = await chatAnalyze({ contents, temperature: 0.4 });
+    } catch (error: any) {
+      toast.error(error?.message || 'AI 对话请求失败');
+      return;
+    }
     const replyText = String(resp.text || '').trim() || '(空回复)';
 
     const nextMessages = [...(session.messages || [])];
@@ -1566,16 +1572,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
 
     const startAt = performance.now();
-    let cursor = 0;
     const workerCount = Math.min(concurrency, runnable.length);
 
+    // 预先分配任务到各个 worker，避免并发竞态条件
+    const taskQueues: string[][] = Array.from({ length: workerCount }, () => []);
+    runnable.forEach((id, idx) => {
+      taskQueues[idx % workerCount].push(id);
+    });
+
     await Promise.all(
-      Array.from({ length: workerCount }).map(async () => {
-        while (true) {
-          const nextId = runnable[cursor];
-          if (!nextId) return;
-          cursor += 1;
-          await get().generateNode(nextId, undefined, { silent: true, autoAnalyze: true });
+      taskQueues.map(async (queue) => {
+        for (const nodeId of queue) {
+          await get().generateNode(nodeId, undefined, { silent: true, autoAnalyze: true });
         }
       })
     );

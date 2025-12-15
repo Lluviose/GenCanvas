@@ -224,7 +224,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     setActiveImageId(selectedNode.data.images?.[0]?.id || null);
     setTagsDraft((selectedNode.data.tags || []).join(', '));
     setAiChatOpen(false);
-  }, [effectiveSelectedNodeId]);
+  }, [effectiveSelectedNodeId, selectedNode]);
 
   const promptSuggestion = useMemo(() => {
     const parsed = selectedNode?.data?.promptAnalysis?.parsed;

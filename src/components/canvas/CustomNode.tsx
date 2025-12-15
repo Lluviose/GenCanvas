@@ -137,6 +137,9 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
   const handleDownloadImage = async (url: string, id: string) => {
     try {
       const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`下载失败: HTTP ${response.status}`);
+      }
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -144,8 +147,8 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
       a.download = `${id}.png`;
       a.click();
       URL.revokeObjectURL(blobUrl);
-    } catch {
-      toast.error('下载失败');
+    } catch (error: any) {
+      toast.error(error?.message || '下载失败');
     }
   };
 
