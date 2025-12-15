@@ -39,9 +39,12 @@ function Layout() {
   );
 }
 
+// GitHub Pages 部署时需要设置 basename
+const basename = import.meta.env.BASE_URL;
+
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Layout />
     </BrowserRouter>
   );

@@ -7,6 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // GitHub Pages 部署时使用仓库名作为 base 路径
+  base: process.env.GITHUB_ACTIONS ? '/GenCanvas/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
