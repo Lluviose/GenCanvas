@@ -78,7 +78,7 @@ class BackgroundTaskManager {
         this.wakeLock = null;
       });
       return true;
-    } catch (e) {
+    } catch {
       // Wake lock 请求失败（可能是页面不可见或权限问题）
       return false;
     }

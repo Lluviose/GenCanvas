@@ -1739,13 +1739,13 @@ export default function Sidebar(props: SidebarProps) {
   return (
     <div className={cn(
       "flex flex-col shrink-0 z-40",
-      isMobile ? "absolute right-0 top-0 bottom-0 h-full pointer-events-none p-3" : "relative h-full py-4 pr-4"
+      isMobile ? "absolute right-0 top-0 bottom-0 h-full pointer-events-none p-2" : "relative h-full py-4 pr-4"
     )}>
       {/* 折叠按钮 - 浮动胶囊 */}
       <div
         className={cn(
           "absolute top-1/2 z-50 transition-all duration-300 pointer-events-auto",
-          isCollapsed ? (isMobile ? "right-3" : "-left-5") : (isMobile ? "right-[calc(85vw+12px)] md:right-[392px]" : "-left-2")
+          isCollapsed ? (isMobile ? "right-2" : "-left-5") : (isMobile ? "right-[calc(85vw+8px)] md:right-[388px]" : "-left-2")
         )}
         style={{ transform: 'translateY(-50%)' }}
       >

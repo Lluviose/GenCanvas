@@ -585,9 +585,15 @@ function CanvasContent() {
           />
           
           {/* 左上角工具栏 - 状态显示 */}
-          <Panel position="top-left" className="!m-4 !z-[100] pointer-events-none flex flex-col gap-3">
+          <Panel
+            position="top-left"
+            className={cn(
+              "!z-[100] pointer-events-none flex flex-col gap-2 sm:gap-3",
+              isMobile ? "!m-2" : "!m-4"
+            )}
+          >
              {/* 占位，把位置留给 Header 的悬浮岛 */}
-             <div className="h-12 w-full"></div>
+             {!isMobile && <div className="h-12 w-full"></div>}
 
              {/* 手机端返回按钮 */}
              {isMobile && (
@@ -647,8 +653,14 @@ function CanvasContent() {
           </Panel>
 
           {/* 右上角控制栏 - 悬浮胶囊 */}
-          <Panel position="top-right" className="!m-4 !z-[100] pointer-events-none flex flex-col gap-3">
-             <div className="h-12 w-full"></div>
+          <Panel
+            position="top-right"
+            className={cn(
+              "!z-[100] pointer-events-none flex flex-col gap-2 sm:gap-3",
+              isMobile ? "!m-2" : "!m-4"
+            )}
+          >
+             {!isMobile && <div className="h-12 w-full"></div>}
             
             <div className="pointer-events-auto bg-card/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 dark:border-white/5 rounded-full p-1.5 shadow-2xl flex items-center gap-1 transition-all hover:bg-card/80">
               {/* 交互模式 */}
@@ -758,7 +770,7 @@ export default function CanvasPage() {
 
   return (
     <ReactFlowProvider>
-      <div className="h-[calc(100vh-56px)] w-full"> 
+      <div className="h-screen supports-[height:100dvh]:h-[100dvh] w-full">
         <CanvasContent />
       </div>
     </ReactFlowProvider>
