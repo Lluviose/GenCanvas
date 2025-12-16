@@ -562,7 +562,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                           focusNode(p.nodeId);
                         }}
                       >
-                        <ResolvedImage src={p.url} alt="" className="w-full h-full object-cover" />
+                        <img src={p.url} alt="" className="w-full h-full object-cover" />
                         {isLast && more > 0 ? (
                           <div className="absolute inset-0 bg-black/55 text-white text-xs font-semibold flex items-center justify-center">
                             +{more}
