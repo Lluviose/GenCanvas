@@ -57,17 +57,17 @@ const iconMap = {
 };
 
 const colorMap = {
-  success: 'bg-green-500/10 border-green-500/20 text-green-400',
-  error: 'bg-red-500/10 border-red-500/20 text-red-400',
-  info: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-  warning: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
+  success: 'text-emerald-400',
+  error: 'text-red-400',
+  info: 'text-blue-400',
+  warning: 'text-amber-400',
 };
 
 export function ToastContainer() {
   const { toasts, removeToast } = useToastStore();
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 w-full max-w-[420px] pointer-events-none px-4">
       {toasts.map((toast) => {
         const Icon = iconMap[toast.type];
         
@@ -75,17 +75,20 @@ export function ToastContainer() {
           <div
             key={toast.id}
             className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg animate-in slide-in-from-right-5 fade-in-0",
-              colorMap[toast.type]
+              "pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-xl border border-white/10 transition-all duration-500 ease-spring-smooth",
+              "bg-black/85 text-white ring-1 ring-white/5", // Dynamic Island aesthetic
+              "animate-in slide-in-from-top-4 fade-in zoom-in-95"
             )}
           >
-            <Icon className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-medium text-foreground">{toast.message}</span>
+            <div className={cn("shrink-0 p-0.5 rounded-full bg-white/10", colorMap[toast.type])}>
+              <Icon className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-medium tracking-tight">{toast.message}</span>
             <button
               onClick={() => removeToast(toast.id)}
-              className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="ml-2 p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         );

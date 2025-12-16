@@ -10,6 +10,7 @@ export default function CustomEdge({
   targetPosition,
   style = {},
   markerEnd,
+  selected,
 }: EdgeProps) {
   const [edgePath] = getBezierPath({
     sourceX,
@@ -22,21 +23,21 @@ export default function CustomEdge({
 
   return (
     <>
-      {/* 增加一个宽一点的透明路径，方便鼠标hover/选中 */}
+      {/* 增加一个宽透明路径，方便鼠标hover/选中 */}
       <path
         d={edgePath}
         style={{ strokeWidth: 20, stroke: 'transparent', fill: 'none' }}
+        className="react-flow__edge-interaction"
       />
       
-      {/* 底部光晕/阴影 */}
+      {/* 装饰层：底部白色/背景色描边，形成"切割"效果，增强层次感 */}
       <path
         d={edgePath}
         style={{
-          ...style,
           strokeWidth: 4,
-          stroke: 'hsl(var(--primary))',
-          opacity: 0.15,
+          stroke: 'hsl(var(--background))',
           fill: 'none',
+          transition: 'all 0.3s ease',
         }}
       />
       
@@ -44,7 +45,13 @@ export default function CustomEdge({
       <BaseEdge
         path={edgePath}
         markerEnd={markerEnd}
-        style={style}
+        style={{
+          ...style,
+          strokeWidth: selected ? 2.5 : 1.5,
+          stroke: selected ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground) / 0.6)',
+          transition: 'all 0.3s ease',
+          filter: selected ? 'drop-shadow(0 1px 2px hsl(var(--primary) / 0.3))' : undefined,
+        }}
         id={id}
       />
     </>

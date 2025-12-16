@@ -33,7 +33,7 @@
     --input: 220 13% 91%;
     --ring: 262 83% 58%;
  
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --success: 142 76% 36%;
     --warning: 38 92% 50%;
@@ -41,33 +41,33 @@
 
   /* 深色模式 */
   .dark {
-    --background: 220 13% 8%;
+    --background: 224 71% 4%;
     --foreground: 210 40% 98%;
 
-    --card: 220 13% 10%;
+    --card: 224 71% 4%;
     --card-foreground: 210 40% 98%;
  
-    --popover: 220 13% 12%;
+    --popover: 224 71% 4%;
     --popover-foreground: 210 40% 98%;
  
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11%;
  
-    --secondary: 220 13% 16%;
+    --secondary: 217 19% 27%;
     --secondary-foreground: 210 40% 98%;
  
-    --muted: 220 13% 16%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 217 19% 27%;
+    --muted-foreground: 215 20% 65%;
  
-    --accent: 262 83% 58%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 210 40% 98%;
+    --accent-foreground: 222 47% 11%;
  
-    --destructive: 0 62% 50%;
+    --destructive: 0 62% 30%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 13% 18%;
-    --input: 220 13% 18%;
-    --ring: 262 83% 58%;
+    --border: 217 19% 27%;
+    --input: 217 19% 27%;
+    --ring: 212 96% 78%;
 
     --success: 142 76% 36%;
     --warning: 38 92% 50%;
@@ -80,60 +80,88 @@
   }
   html {
     height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     font-feature-settings: "rlig" 1, "calt" 1;
     min-height: 100%;
     position: relative;
   }
 }
 
-/* React Flow 自定义样式 */
+/* React Flow 自定义样式 - Apple Style Refinement */
 .react-flow__background {
   background-color: hsl(var(--background)) !important;
 }
 
 .react-flow__minimap {
-  background: hsl(var(--card) / 0.6) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 8px;
+  background: hsl(var(--card) / 0.7) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 /* 日间模式 MiniMap 边框 */
 :root .react-flow__minimap,
 .light .react-flow__minimap {
-  border: 1px solid hsl(var(--border) / 0.8) !important;
-  box-shadow: 0 2px 8px hsl(var(--foreground) / 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
 }
 
 /* 深色模式 MiniMap 边框 */
 .dark .react-flow__minimap {
-  border: 1px solid hsl(var(--border) / 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .react-flow__controls {
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  background-color: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 4px;
 }
 
 .react-flow__controls-button {
-  background-color: hsl(var(--card));
-  border-bottom: 1px solid hsl(var(--border));
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  margin: 2px;
   fill: hsl(var(--muted-foreground));
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .react-flow__controls-button:hover {
   background-color: hsl(var(--secondary));
+  fill: hsl(var(--foreground));
+  transform: scale(1.05);
 }
 
 .react-flow__edge-path {
+  stroke: hsl(var(--muted-foreground) / 0.6);
+  stroke-width: 1.5;
+  transition: all 0.3s ease;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
   stroke: hsl(var(--primary));
-  stroke-width: 2;
+  stroke-width: 2.5;
+}
+
+/* Arrow Marker Styling */
+.react-flow__marker {
+  fill: hsl(var(--muted-foreground) / 0.6);
+  transition: all 0.3s ease;
+}
+
+.react-flow__edge.selected .react-flow__marker {
+  fill: hsl(var(--primary));
 }
 
 /* 确保 ReactFlow Panel 在手机端缩放时不会消失 */
@@ -150,27 +178,43 @@
 }
 
 .react-flow__handle {
-  background-color: hsl(var(--primary)) !important;
-  border: 2px solid hsl(var(--card)) !important;
+  background-color: hsl(var(--background)) !important;
+  border: 2px solid hsl(var(--primary)) !important;
+  width: 10px;
+  height: 10px;
+  transition: transform 0.2s;
 }
 
-/* 滚动条样式 */
+.react-flow__handle:hover {
+  transform: scale(1.2);
+}
+
+/* macOS 风格滚动条 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--card));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 4px;
+  background: hsl(var(--muted-foreground) / 0.3);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: hsl(var(--muted-foreground) / 0.5);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 @layer utilities {

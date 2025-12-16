@@ -102,9 +102,9 @@ export function PromptPartsEditor({
     token.setAttribute('data-pp-id', img.id);
     token.setAttribute('contenteditable', 'false');
     token.className = cn(
-      'inline-flex items-center gap-1 align-middle',
-      'mx-0.5 my-0.5 px-1 py-1 rounded-md border',
-      'bg-secondary/40 border-border',
+      'inline-flex items-center gap-1.5 align-middle',
+      'mx-1 my-0.5 px-1.5 py-1 rounded-lg border shadow-sm',
+      'bg-background/80 backdrop-blur-sm border-border/50 select-none',
       img.annotation ? 'ring-1 ring-primary/40' : ''
     );
     if (img.annotation) token.title = img.annotation;
@@ -112,7 +112,7 @@ export function PromptPartsEditor({
     const thumb = document.createElement('img');
     thumb.src = toImageSrc({ mimeType: img.mimeType, data: img.data });
     thumb.alt = img.annotation ? `参考图：${img.annotation}` : '参考图';
-    thumb.className = 'w-8 h-8 rounded object-cover border border-border';
+    thumb.className = 'w-8 h-8 rounded-md object-cover border border-border/20';
     token.appendChild(thumb);
 
     const badge = document.createElement('span');
@@ -477,9 +477,10 @@ export function PromptPartsEditor({
       <div
         ref={editorRef}
         className={cn(
-          'prompt-editor w-full min-h-[110px] rounded-md border border-border bg-background px-3 py-2 text-sm',
+          'prompt-editor w-full min-h-[110px] rounded-xl border border-input/50 bg-secondary/20 px-3 py-2 text-sm',
           'whitespace-pre-wrap break-words',
-          'focus:outline-none focus:ring-2 focus:ring-primary/50',
+          'focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-background',
+          'transition-all duration-300 ease-spring-smooth hover:bg-secondary/30',
           'pr-12',
           disabled && 'opacity-60 pointer-events-none',
           hasImagesInValue && 'bg-gradient-to-b from-primary/5 to-transparent',

@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { hasEffectivePromptContent } from '@/lib/promptParts';
 import { ResolvedImage } from '@/components/ui/ResolvedImage';
-import { BookMarked, Copy, GitBranch, Image as ImageIcon, Loader2, Play, RotateCcw, Sparkles, Star, Trash2, Wand2, X, ArrowRight, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookMarked, Copy, GitBranch, Image as ImageIcon, Loader2, Play, RotateCcw, Sparkles, Star, Trash2, X, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PromptPartsEditor } from './PromptPartsEditor';
 import { AiChatDialog } from './AiChatDialog';
 
@@ -37,18 +37,11 @@ const parseTags = (raw: string) =>
     .slice(0, 30);
 
 const STATUS_LABEL: Record<string, string> = {
-  idle: '未生成',
-  queued: '排队中',
-  running: '生成中',
-  completed: '已完成',
-  failed: '失败',
-};
-
-const REV_SOURCE_LABEL: Record<string, string> = {
-  manual: '手动',
-  asset: '提示词库',
-  suggestion: '建议',
-  rollback: '还原',
+  idle: 'Idle',
+  queued: 'Queued',
+  running: 'Running',
+  completed: 'Done',
+  failed: 'Failed',
 };
 
 type SidebarProps = {
@@ -67,22 +60,17 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     removeNode,
     duplicateNode,
     addNode,
-    branchNode,
     generateFromNode,
     generateNodes,
     toggleFavoriteNode,
-    analyzeNodePrompt,
-    analyzeNodeImage,
     savePromptToLibrary,
-    applyPromptAssetToNode,
     clearSelection,
     selectOnlyNode,
-    clearFailedNodes,
   } = useCanvasStore();
 
   const quickBranchPresets = usePreferencesStore((s) => s.prefs.quickBranchPresets) || QUICK_BRANCH_SUGGESTIONS;
   const prefs = usePreferencesStore((s) => s.prefs);
-  const updatePrefs = usePreferencesStore((s) => s.updatePrefs);
+  // updatePrefs removed - not used in current redesign
 
   const activeNodes = useMemo(() => nodes.filter((n) => !n.data.archived), [nodes]);
   const selectedNodes = useMemo(() => activeNodes.filter((n) => n.selected), [activeNodes]);
@@ -94,15 +82,11 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [continuing, setContinuing] = useState(false);
   const [continuingFromImage, setContinuingFromImage] = useState(false);
-  const [analyzingPrompt, setAnalyzingPrompt] = useState(false);
-  const [analyzingImage, setAnalyzingImage] = useState(false);
+  // analyzingImage state removed - not used in current redesign
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [batchConcurrency, setBatchConcurrency] = useState<(typeof CONCURRENCY_OPTIONS)[number]>(3);
   const [batchGenerating, setBatchGenerating] = useState(false);
-  const [batchBranchDraft, setBatchBranchDraft] = useState('');
-  const [batchBranching, setBatchBranching] = useState(false);
   const [canvasSearch, setCanvasSearch] = useState('');
   const [activeCanvasTag, setActiveCanvasTag] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -111,10 +95,9 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   // Sidebar Tabs
   const [sidebarTab, setSidebarTab] = useState<'canvas' | 'library'>('canvas');
   const [librarySearch, setLibrarySearch] = useState('');
-  const [activeLibraryTag, setActiveLibraryTag] = useState('');
+  const [activeLibraryTag] = useState('');
 
-  const favoriteNodes = useMemo(() => activeNodes.filter((n) => n.data.favorite), [activeNodes]);
-  const failedNodesCount = useMemo(() => activeNodes.filter((n) => n.data.status === 'failed').length, [activeNodes]);
+  // Note: favoriteNodes and failedNodesCount could be used for future features
 
   const topTags = useMemo(() => {
     const tagCounts = new Map<string, number>();
@@ -127,7 +110,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     }
     return Array.from(tagCounts.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 18)
+      .slice(0, 10) // Reduced to 10
       .map(([t]) => t);
   }, [activeNodes]);
 
@@ -149,20 +132,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     return result.slice(0, 60);
   }, [activeNodes, canvasSearch, activeCanvasTag, favoritesOnly]);
 
-  const libraryTags = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const p of promptLibrary) {
-      for (const t of p.tags || []) {
-        const k = String(t || '').trim();
-        if (!k) continue;
-        counts.set(k, (counts.get(k) || 0) + 1);
-      }
-    }
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 18)
-      .map(([t]) => t);
-  }, [promptLibrary]);
+  // libraryTags removed - not currently used in redesigned UI
 
   const filteredLibrary = useMemo(() => {
     const q = librarySearch.trim().toLowerCase();
@@ -218,7 +188,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
       onFocusNode?.(newNodeId);
     });
     
-    toast.success('已从库中创建节点');
+    toast.success('Created from library');
   };
 
   useEffect(() => {
@@ -241,23 +211,6 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     }
   }, [selectedNode?.data?.images, activeImageId, selectedNode]);
 
-  const promptSuggestion = useMemo(() => {
-    const parsed = selectedNode?.data?.promptAnalysis?.parsed;
-    const suggestedPrompt = typeof parsed?.suggestedPrompt === 'string' ? parsed.suggestedPrompt : '';
-    return { suggestedPrompt };
-  }, [selectedNode?.data?.promptAnalysis?.parsed]);
-
-  const imageAnalysis = useMemo(() => {
-    if (!selectedNode || !activeImageId) return null;
-    return selectedNode.data.imageAnalyses?.[activeImageId] || null;
-  }, [selectedNode, activeImageId]);
-
-  const imageSuggestion = useMemo(() => {
-    const parsed = imageAnalysis?.parsed as any;
-    const suggestedPrompt = typeof parsed?.suggestedPrompt === 'string' ? String(parsed.suggestedPrompt).trim() : '';
-    return { suggestedPrompt };
-  }, [imageAnalysis?.parsed]);
-
   const parentId = useMemo(() => {
     if (!effectiveSelectedNodeId) return null;
     return edges.find((e) => e.target === effectiveSelectedNodeId)?.source || null;
@@ -273,7 +226,6 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   }, [edges, effectiveSelectedNodeId, activeNodes]);
 
   const revisions = selectedNode?.data.revisions || [];
-  const isNodeBusy = Boolean(selectedNode && (selectedNode.data.status === 'running' || selectedNode.data.status === 'queued'));
 
   const handleChange = (field: keyof NodeData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -294,13 +246,13 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   const handleSave = () => {
     if (!nodeId) return;
     commitNodeEdit(nodeId, buildEditablePatch(), { source: 'manual' });
-    toast.success('已保存');
+    toast.success('Changes saved');
   };
 
   const handleGenerate = async () => {
     if (!nodeId) return;
     if (!hasEffectivePromptContent(String(formData.prompt || ''), formData.promptParts)) {
-      toast.error('请先填写提示词');
+      toast.error('Please enter a prompt');
       return;
     }
     setGenerating(true);
@@ -317,7 +269,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   const handleRegenerate = async () => {
     if (!nodeId) return;
     if (!hasEffectivePromptContent(String(formData.prompt || ''), formData.promptParts)) {
-      toast.error('请先填写提示词');
+      toast.error('Please enter a prompt');
       return;
     }
     setRegenerating(true);
@@ -331,61 +283,12 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     }
   };
 
-  const handleContinue = async () => {
-    if (!nodeId) return;
-    if (!hasEffectivePromptContent(String(formData.prompt || ''), formData.promptParts)) {
-      toast.error('请先填写提示词');
-      return;
-    }
-
-    const overrides: Partial<NodeData> = {
-      prompt: String(formData.prompt || ''),
-      promptParts: formData.promptParts,
-      count: Math.max(1, Math.min(8, Number(formData.count || 1) || 1)),
-      imageSize: (formData.imageSize || selectedNode?.data.imageSize || '2K') as NodeData['imageSize'],
-      aspectRatio: (formData.aspectRatio || selectedNode?.data.aspectRatio || 'auto') as NodeData['aspectRatio'],
-    };
-
-    setContinuing(true);
-    try {
-      const newIds = await generateFromNode(nodeId, { mode: 'append', overrides });
-      if (newIds?.[0]) onFocusNode?.(newIds[0]);
-    } finally {
-      setContinuing(false);
-    }
-  };
-
-  const handleAnalyzePrompt = async () => {
-    if (!nodeId) return;
-    const prompt = String(formData.prompt || '').trim();
-    if (!prompt) {
-      toast.error('请先填写提示词');
-      return;
-    }
-    setAnalyzingPrompt(true);
-    try {
-      const patch = buildEditablePatch();
-      commitNodeEdit(nodeId, patch, { source: 'manual' });
-      await analyzeNodePrompt(nodeId);
-    } finally {
-      setAnalyzingPrompt(false);
-    }
-  };
-
-  const handleAnalyzeImage = async () => {
-    if (!nodeId || !activeImageId) return;
-    setAnalyzingImage(true);
-    try {
-      await analyzeNodeImage(nodeId, activeImageId);
-    } finally {
-      setAnalyzingImage(false);
-    }
-  };
+  // handleAnalyzeImage removed - not used in current redesign
 
   const handleContinueFromImage = async () => {
     if (!nodeId || !activeImageId) return;
     if (!hasEffectivePromptContent(String(formData.prompt || ''), formData.promptParts)) {
-      toast.error('请先填写提示词');
+      toast.error('Please enter a prompt');
       return;
     }
 
@@ -409,73 +312,26 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     }
   };
 
-  const parseBatchTweaks = (raw: string) =>
-    String(raw || '')
-      .split(/\r?\n/g)
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .slice(0, 12);
-
-  const handleBatchBranch = async (autoGenerate: boolean) => {
-    if (!nodeId) return;
-    const basePrompt = String(formData.prompt || '').trim();
-    if (!basePrompt) {
-      toast.error('请先填写提示词');
-      return;
-    }
-    const tweaks = parseBatchTweaks(batchBranchDraft);
-    if (tweaks.length === 0) {
-      toast.error('请至少输入一行分支变化');
-      return;
-    }
-
-    const baseOverrides = buildEditablePatch();
-    delete (baseOverrides as any).tags;
-    delete (baseOverrides as any).notes;
-
-    setBatchBranching(true);
-    try {
-      const newIds: string[] = [];
-      for (const tweak of tweaks) {
-        const nextPrompt = `${basePrompt}, ${tweak}`;
-        const newId = branchNode(nodeId, { ...baseOverrides, prompt: nextPrompt, notes: tweak } as Partial<NodeData>);
-        if (newId) newIds.push(newId);
-      }
-
-      if (newIds.length === 0) return;
-      selectOnlyNode(newIds[0]);
-      onFocusNode?.(newIds[0]);
-
-      if (autoGenerate) {
-        await generateNodes(newIds, { concurrency: batchConcurrency });
-      }
-
-      setBatchBranchDraft('');
-    } finally {
-      setBatchBranching(false);
-    }
-  };
-
   if (selectedNodes.length > 1) {
     const ids = selectedNodes.map((n) => n.id);
 
     return (
-      <div className="w-full bg-background h-full flex flex-col">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card gap-3">
+      <div className="w-full h-full flex flex-col bg-transparent text-foreground">
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">对比 {selectedNodes.length} 个节点</div>
-            <div className="text-xs text-muted-foreground truncate">批量生成并横向对比结果</div>
+            <div className="text-sm font-semibold truncate">Batch Mode</div>
+            <div className="text-xs text-muted-foreground truncate">Comparing {selectedNodes.length} nodes</div>
           </div>
           <div className="flex items-center gap-2">
             <select
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+              className="h-8 rounded-lg border-none bg-secondary/30 px-2 text-xs"
               value={batchConcurrency}
               onChange={(e) => setBatchConcurrency(Number(e.target.value) as any)}
-              title="并发数"
+              title="Concurrency"
             >
               {CONCURRENCY_OPTIONS.map((v) => (
                 <option key={v} value={v}>
-                  并发 {v}
+                  {v}x
                 </option>
               ))}
             </select>
@@ -491,17 +347,16 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                   setBatchGenerating(false);
                 }
               }}
-              title="并发批量生成"
             >
               {batchGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  生成中…
+                  Running...
                 </>
               ) : (
                 <>
                   <Play className="mr-2 h-4 w-4 fill-current" />
-                  批量生成
+                  Run All
                 </>
               )}
             </Button>
@@ -510,7 +365,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
               size="icon"
               className="h-8 w-8"
               onClick={() => clearSelection()}
-              title="清除选择"
+              title="Clear Selection"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -519,42 +374,33 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {selectedNodes.map((node) => {
-            const disabled = node.data.status === 'running' || node.data.status === 'queued';
-            const status =
-              node.data.status === 'queued'
-                ? '排队中'
-                : node.data.status === 'running'
-                  ? '生成中'
-                  : node.data.status === 'completed'
-                    ? '完成'
-                    : node.data.status === 'failed'
-                      ? '失败'
-                      : '空闲';
+            // disabled state computed inline where needed
+            const status = STATUS_LABEL[node.data.status] || node.data.status;
 
             return (
               <div
                 key={node.id}
-                className="rounded-xl border border-border bg-card p-3 space-y-3"
+                className="rounded-xl border border-white/5 bg-white/5 p-3 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-xs text-muted-foreground truncate">
-                      {node.data.imageSize} · {node.data.aspectRatio} · {node.data.count} 张
+                      {node.data.imageSize} · {node.data.aspectRatio} · {node.data.count}
                     </div>
                     <div className="text-sm font-medium text-foreground/90 line-clamp-2">
-                      {node.data.prompt || <span className="text-muted-foreground italic">（空提示词）</span>}
+                      {node.data.prompt || <span className="text-muted-foreground italic">(Empty)</span>}
                     </div>
                   </div>
                   <div
                     className={cn(
-                      'shrink-0 text-xs px-2 py-1 rounded-md border',
+                      'shrink-0 text-xs px-2 py-1 rounded-md font-medium',
                       node.data.status === 'completed'
-                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
+                        ? 'bg-emerald-500/10 text-emerald-400'
                         : node.data.status === 'failed'
-                          ? 'border-red-500/20 bg-red-500/10 text-red-300'
+                          ? 'bg-red-500/10 text-red-400'
                           : node.data.status === 'running' || node.data.status === 'queued'
-                            ? 'border-blue-500/20 bg-blue-500/10 text-blue-300'
-                            : 'border-border bg-background text-muted-foreground'
+                            ? 'bg-blue-500/10 text-blue-400'
+                            : 'bg-secondary text-muted-foreground'
                     )}
                   >
                     {status}
@@ -566,54 +412,11 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     {node.data.images.slice(0, 4).map((img) => (
                       <div
                         key={img.id}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-border bg-background"
+                        className="relative aspect-square rounded-lg overflow-hidden border border-white/5 bg-black/20"
                       >
                         <ResolvedImage src={img.url} alt={img.id} className="w-full h-full object-cover" />
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="w-full aspect-[2/1] rounded-lg border border-dashed border-border bg-background flex flex-col items-center justify-center text-muted-foreground gap-2">
-                    <ImageIcon className="h-7 w-7 opacity-30" />
-                    <span className="text-xs opacity-60">暂无图片</span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    className="h-8"
-                    disabled={disabled}
-                    onClick={async () => {
-                      if (!hasEffectivePromptContent(String(node.data.prompt || ''), node.data.promptParts)) {
-                        toast.error('请先填写提示词');
-                        return;
-                      }
-                      const newIds = await generateFromNode(node.id, { mode: 'append' });
-                      if (newIds?.[0]) onFocusNode?.(newIds[0]);
-                    }}
-                    title={disabled ? '该节点正在生成' : '生成该节点'}
-                  >
-                    <Play className="mr-2 h-4 w-4 fill-current" />
-                    生成
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-8"
-                    onClick={() => {
-                      selectOnlyNode(node.id);
-                      onFocusNode?.(node.id);
-                    }}
-                    title="打开单节点详情"
-                  >
-                    打开
-                  </Button>
-                </div>
-
-                {node.data.errorMessage ? (
-                  <div className={cn('text-xs', node.data.status === 'failed' ? 'text-red-300' : 'text-amber-300')}>
-                    {node.data.errorMessage}
                   </div>
                 ) : null}
               </div>
@@ -627,31 +430,31 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   if (!nodeId || !selectedNode) {
     // 无选中节点时：提供 "画布检索" 和 "全局库" 两个 Tab
     return (
-      <div className="w-full bg-background h-full flex flex-col">
-        {/* Tab Header */}
-        <div className="px-4 py-0 border-b border-border bg-card">
-          <div className="flex items-center gap-6">
+      <div className="w-full h-full flex flex-col bg-transparent text-foreground">
+        {/* Tab Header - Segmented Control */}
+        <div className="px-5 py-4 shrink-0">
+          <div className="flex p-1 bg-secondary/50 rounded-xl">
             <button
               onClick={() => setSidebarTab('canvas')}
               className={cn(
-                "py-3 text-sm font-medium border-b-2 transition-colors",
+                "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-sm",
                 sidebarTab === 'canvas'
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "bg-transparent text-muted-foreground hover:text-foreground shadow-none"
               )}
             >
-              画布节点
+              Canvas Nodes
             </button>
             <button
               onClick={() => setSidebarTab('library')}
               className={cn(
-                "py-3 text-sm font-medium border-b-2 transition-colors",
+                "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all",
                 sidebarTab === 'library'
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "bg-transparent text-muted-foreground hover:text-foreground shadow-none"
               )}
             >
-              提示词库
+              Prompt Library
             </button>
           </div>
         </div>
@@ -659,164 +462,84 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
         {/* Tab 1: 画布检索 */}
         {sidebarTab === 'canvas' && (
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="px-4 py-3 border-b border-border bg-card/50">
-              <div className="text-xs text-muted-foreground">检索当前画布内的节点与历史</div>
+            <div className="px-5 pb-3">
+              <Input
+                value={canvasSearch}
+                onChange={(e) => setCanvasSearch(e.target.value)}
+                placeholder="Search nodes..."
+                className="bg-secondary/30 border-transparent focus-visible:bg-background h-9 rounded-xl text-xs"
+              />
+              <div className="flex items-center gap-2 mt-2 overflow-x-auto no-scrollbar py-1">
+                <button
+                   onClick={() => setFavoritesOnly((v) => !v)}
+                   className={cn(
+                     "shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-medium border transition-colors flex items-center gap-1",
+                     favoritesOnly 
+                       ? "bg-yellow-400/10 border-yellow-400/20 text-yellow-500" 
+                       : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary/50"
+                   )}
+                >
+                  <Star className={cn("w-3 h-3", favoritesOnly && "fill-current")} />
+                  Favorites
+                </button>
+                {topTags.map((t) => (
+                  <button
+                    key={t}
+                    className={cn(
+                      'shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-medium border transition-colors',
+                      activeCanvasTag === t
+                        ? 'bg-primary/10 border-primary/20 text-primary'
+                        : 'bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary/50'
+                    )}
+                    onClick={() => setActiveCanvasTag((prev) => (prev === t ? '' : t))}
+                  >
+                    #{t}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="space-y-2">
-                <Input
-                  value={canvasSearch}
-                  onChange={(e) => setCanvasSearch(e.target.value)}
-                  placeholder="搜索：人物/风格/构图/氛围…"
-                  className="bg-background"
-                />
-                <div className="flex items-center justify-between gap-2">
-                  <Button
-                    size="sm"
-                    variant={favoritesOnly ? 'secondary' : 'outline'}
-                    className="h-8"
-                    onClick={() => setFavoritesOnly((v) => !v)}
+            <div className="flex-1 overflow-y-auto px-4 space-y-2 pb-4">
+              {filteredNodes.length ? (
+                filteredNodes.map((n) => (
+                  <div
+                    key={n.id}
+                    className="group flex flex-col gap-1.5 p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all cursor-pointer active:scale-[0.98]"
+                    onClick={() => {
+                      selectOnlyNode(n.id);
+                      onFocusNode?.(n.id);
+                    }}
                   >
-                    <Star className={cn('mr-2 h-4 w-4', favoritesOnly ? 'fill-yellow-400 text-yellow-400' : '')} />
-                    只看收藏
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    {failedNodesCount > 0 ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8"
-                        onClick={() => {
-                          if (!confirm(`确定清除 ${failedNodesCount} 个失败节点吗？`)) return;
-                          clearFailedNodes();
-                        }}
-                        title="一键清除生成失败的节点"
-                      >
-                        清除失败（{failedNodesCount}）
-                      </Button>
-                    ) : null}
-                    {activeCanvasTag ? (
-                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setActiveCanvasTag('')}>
-                        清除标签
-                      </Button>
-                    ) : null}
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded font-medium",
+                        n.data.status === 'completed' ? "bg-emerald-500/10 text-emerald-500" :
+                        n.data.status === 'failed' ? "bg-red-500/10 text-red-500" :
+                        "bg-blue-500/10 text-blue-500"
+                      )}>
+                        {STATUS_LABEL[n.data.status] || n.data.status}
+                      </span>
+                      {n.data.favorite && <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />}
+                    </div>
+                    <p className="text-xs font-medium leading-relaxed line-clamp-2 text-foreground/90">
+                      {n.data.prompt || <span className="text-muted-foreground italic">Empty prompt...</span>}
+                    </p>
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 mt-1">
+                      <span>{n.data.imageSize}</span>
+                      <span>•</span>
+                      <span>{new Date(n.data.updatedAt || n.data.createdAt).toLocaleDateString()}</span>
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="py-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-3">
+                    <Sparkles className="w-5 h-5 opacity-40" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">No nodes found</p>
+                  <p className="text-[10px] text-muted-foreground/50 mt-1">Double click canvas to create one</p>
                 </div>
-                {topTags.length ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {topTags.map((t) => {
-                      const active = activeCanvasTag === t;
-                      return (
-                        <button
-                          key={t}
-                          className={cn(
-                            'px-2 py-1 rounded-full border text-[11px]',
-                            active
-                              ? 'border-primary bg-primary/15 text-primary'
-                              : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                          )}
-                          onClick={() => setActiveCanvasTag((prev) => (prev === t ? '' : t))}
-                          title="按标签过滤"
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-
-              {favoriteNodes.length ? (
-                <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-                  <div className="text-sm font-medium flex items-center gap-2">
-                    <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                    收藏节点
-                  </div>
-                  <div className="space-y-2">
-                    {favoriteNodes.slice(0, 8).map((n) => (
-                      <div
-                        key={n.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-2 py-2"
-                      >
-                        <div
-                          className="min-w-0 flex-1 cursor-pointer"
-                          onClick={() => {
-                            selectOnlyNode(n.id);
-                            onFocusNode?.(n.id);
-                          }}
-                          title="打开节点"
-                        >
-                          <div className="text-xs text-foreground/90 truncate">{n.data.prompt || '（未填写提示词）'}</div>
-                          <div className="text-[11px] text-muted-foreground truncate">{STATUS_LABEL[n.data.status] || n.data.status}</div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => toggleFavoriteNode(n.id)}
-                          title="取消收藏"
-                        >
-                          <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                        </Button>
-                      </div>
-                    ))}
-                    {favoriteNodes.length > 8 ? (
-                      <div className="text-[11px] text-muted-foreground">还有 {favoriteNodes.length - 8} 个收藏…</div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-                <div className="text-sm font-medium">搜索结果</div>
-                {filteredNodes.length ? (
-                  <div className="space-y-2">
-                    {filteredNodes.map((n) => (
-                      <div
-                        key={n.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-2 py-2"
-                      >
-                        <div
-                          className="min-w-0 flex-1 cursor-pointer"
-                          onClick={() => {
-                            selectOnlyNode(n.id);
-                            onFocusNode?.(n.id);
-                          }}
-                          title="打开节点"
-                        >
-                          <div className="text-xs text-foreground/90 truncate">{n.data.prompt || '（未填写提示词）'}</div>
-                          <div className="text-[11px] text-muted-foreground truncate">
-                            {STATUS_LABEL[n.data.status] || n.data.status}
-                            {n.data.tags?.length ? ` · ${n.data.tags.slice(0, 3).join(' / ')}` : ''}
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => toggleFavoriteNode(n.id)}
-                          title={n.data.favorite ? '取消收藏' : '收藏节点'}
-                        >
-                          <Star
-                            className={cn(
-                              'h-4 w-4',
-                              n.data.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground hover:text-yellow-400'
-                            )}
-                          />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">暂无匹配节点</div>
-                )}
-              </div>
-
-              <div className="text-xs text-muted-foreground flex items-center justify-center gap-2 pt-4">
-                <Sparkles className="h-4 w-4 opacity-60" />
-                双击画布空白处可创建新节点
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -824,111 +547,55 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
         {/* Tab 2: 提示词库 (Global Library) */}
         {sidebarTab === 'library' && (
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="px-4 py-3 border-b border-border bg-card/50">
-              <div className="text-xs text-muted-foreground">从全局库中复用资产，点击使用创建新节点</div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="space-y-2">
-                <Input
+            <div className="px-5 pb-3">
+               <Input
                   value={librarySearch}
                   onChange={(e) => setLibrarySearch(e.target.value)}
-                  placeholder="搜索库：标题/提示词/标签…"
-                  className="bg-background"
+                  placeholder="Search library..."
+                  className="bg-secondary/30 border-transparent focus-visible:bg-background h-9 rounded-xl text-xs"
                 />
-                
-                {libraryTags.length ? (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {libraryTags.map((t) => {
-                      const active = activeLibraryTag === t;
-                      return (
-                        <button
-                          key={t}
-                          className={cn(
-                            'px-2 py-1 rounded-full border text-[11px]',
-                            active
-                              ? 'border-primary bg-primary/15 text-primary'
-                              : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                          )}
-                          onClick={() => setActiveLibraryTag((prev) => (prev === t ? '' : t))}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
-                    {activeLibraryTag && (
-                       <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => setActiveLibraryTag('')}>
-                        清除
-                      </Button>
-                    )}
-                  </div>
-                ) : null}
-              </div>
+            </div>
 
-              <div className="space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-4">
                 {filteredLibrary.length ? (
                   filteredLibrary.map((asset) => (
                     <div
                       key={asset.id}
-                      className="rounded-lg border border-border bg-card p-3 space-y-2 group hover:border-primary/50 transition-colors"
+                      className="group p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="min-w-0">
-                          <div className="text-sm font-medium truncate text-foreground/90">
-                            {asset.title || asset.prompt}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                            {asset.prompt}
+                          <div className="text-sm font-semibold text-foreground/90 truncate">
+                            {asset.title || 'Untitled Asset'}
                           </div>
                           {asset.tags?.length ? (
-                            <div className="flex flex-wrap gap-1 mt-2">
+                            <div className="flex flex-wrap gap-1 mt-1.5">
                               {asset.tags.slice(0, 3).map(t => (
-                                <span key={t} className="px-1.5 py-0.5 rounded border border-border/50 bg-background/50 text-[10px] text-muted-foreground">
-                                  {t}
-                                </span>
+                                <span key={t} className="text-[10px] text-muted-foreground/70">#{t}</span>
                               ))}
                             </div>
                           ) : null}
                         </div>
-                      </div>
-                      
-                      <div className="pt-2 flex items-center justify-between border-t border-border/50 mt-2">
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                           {asset.isFavorite && <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />}
-                           {typeof asset.aiQualityScore === 'number' && asset.aiQualityScore >= 80 && (
-                             <span className="text-emerald-400 flex items-center gap-0.5">
-                               <Wand2 className="w-3 h-3" />
-                               {Math.round(asset.aiQualityScore)}
-                             </span>
-                           )}
-                        </div>
                         <Button 
                           size="sm" 
-                          className="h-7 px-3 text-xs"
+                          className="h-7 w-7 p-0 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground shadow-none"
                           onClick={() => handleCreateFromAsset(asset)}
+                          title="Use this prompt"
                         >
-                          <Plus className="w-3.5 h-3.5 mr-1" />
-                          使用
+                          <Plus className="w-4 h-4" />
                         </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground/80 line-clamp-3 leading-relaxed bg-black/5 p-2 rounded-lg">
+                        {asset.prompt}
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="py-10 text-center text-xs text-muted-foreground">
                     <BookMarked className="w-8 h-8 opacity-20 mx-auto mb-2" />
-                    没有找到匹配的提示词
+                    No assets found
                   </div>
                 )}
-                
-                {promptLibrary.length === 0 && (
-                   <div className="p-4 rounded-lg bg-secondary/30 text-center space-y-2">
-                     <p className="text-xs text-muted-foreground">提示词库为空</p>
-                     <p className="text-[10px] text-muted-foreground/70">
-                       在画布中选中满意的节点，点击“存入提示词库”，即可在这里复用。
-                     </p>
-                   </div>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -937,94 +604,171 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   }
 
   return (
-    <div className="w-full bg-background h-full flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
+    <div className="w-full h-full flex flex-col bg-transparent text-foreground font-sans">
+      {/* Header - Single Node Selection */}
+      <div className="px-5 py-4 flex items-center justify-between shrink-0">
         <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{selectedNode.data.modelName}</div>
-          <div className="text-xs text-muted-foreground truncate">
-            {selectedNode.data.imageSize} · {selectedNode.data.aspectRatio} · {selectedNode.data.count} 张
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-xs font-bold text-primary tracking-wide uppercase">Node Settings</span>
+            {selectedNode.data.favorite && <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />}
+          </div>
+          <div className="text-[10px] text-muted-foreground font-mono">
+            {selectedNode.data.modelName} • {selectedNode.data.imageSize}
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearSelection} title="关闭">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-secondary/50"
+            onClick={() => toggleFavoriteNode(nodeId)}
+            title={selectedNode.data.favorite ? 'Unfavorite' : 'Favorite'}
+          >
+            <Star
+              className={cn(
+                'h-4 w-4',
+                selectedNode.data.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'
+              )}
+            />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-secondary/50"
+            onClick={clearSelection}
+            title="Close"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 space-y-6 pb-6">
         {selectedNode.data.errorMessage ? (
           <div
             className={cn(
-              'rounded-lg border px-3 py-2 text-xs',
+              'rounded-xl border px-3 py-2.5 text-xs font-medium',
               selectedNode.data.status === 'failed'
-                ? 'border-red-500/30 bg-red-500/10 text-red-300'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                ? 'border-red-500/20 bg-red-500/10 text-red-400'
+                : 'border-amber-500/20 bg-amber-500/10 text-amber-400'
             )}
           >
             {selectedNode.data.errorMessage}
           </div>
         ) : null}
 
-        {/* Prompt */}
+        {/* Prompt Section */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">提示词</label>
-          <PromptPartsEditor
-            value={String(formData.prompt || '')}
-            promptParts={formData.promptParts}
-            placeholder="描述主体、风格、构图、光线、材质、镜头…（可用右侧 + 插入参考图）"
-            onChange={({ prompt, promptParts: nextParts }) => {
-              handleChange('prompt', prompt);
-              handleChange('promptParts', nextParts);
-            }}
-          />
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prompt</label>
+          <div className="rounded-xl overflow-hidden ring-1 ring-white/10 bg-white/5 focus-within:ring-primary/50 transition-all">
+            <PromptPartsEditor
+              value={String(formData.prompt || '')}
+              promptParts={formData.promptParts}
+              placeholder="What do you want to create?"
+              className="bg-transparent border-none"
+              editorClassName="bg-transparent border-none min-h-[100px] text-sm leading-relaxed px-3 py-3"
+              onChange={({ prompt, promptParts: nextParts }) => {
+                handleChange('prompt', prompt);
+                handleChange('promptParts', nextParts);
+              }}
+            />
+          </div>
+        </div>
+        
+        {/* Params Grid */}
+        <div className="grid grid-cols-2 gap-3">
+           <div className="space-y-1.5">
+             <label className="text-xs font-semibold text-muted-foreground">Count</label>
+             <div className="flex items-center gap-2 bg-secondary/30 rounded-lg p-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={8}
+                  className="h-7 bg-transparent border-none text-center font-mono text-sm shadow-none focus-visible:ring-0 px-0"
+                  value={Number(formData.count || 1)}
+                  onChange={(e) => handleChange('count', Number(e.target.value) || 1)}
+                />
+             </div>
+           </div>
+           <div className="space-y-1.5">
+             <label className="text-xs font-semibold text-muted-foreground">Size</label>
+              <select
+                className="w-full h-9 rounded-lg border-none bg-secondary/30 px-2 text-xs font-medium focus:ring-2 focus:ring-primary/20"
+                value={(formData.imageSize as any) || '2K'}
+                onChange={(e) => handleChange('imageSize', e.target.value)}
+              >
+                {IMAGE_SIZE_OPTIONS.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+           </div>
+           <div className="space-y-1.5 col-span-2">
+             <label className="text-xs font-semibold text-muted-foreground">Aspect Ratio</label>
+             <div className="grid grid-cols-6 gap-1">
+                {ASPECT_RATIO_OPTIONS.map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => handleChange('aspectRatio', v)}
+                    className={cn(
+                      "aspect-square rounded-md flex items-center justify-center text-[10px] font-medium transition-all",
+                      (formData.aspectRatio || 'auto') === v
+                        ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                        : "bg-secondary/30 text-muted-foreground hover:bg-secondary/60"
+                    )}
+                    title={v}
+                  >
+                    {v === 'auto' ? 'A' : v.replace(':', '/')}
+                  </button>
+                ))}
+             </div>
+           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">标签（逗号分隔）</label>
-          <Input
-            value={tagsDraft}
-            onChange={(e) => {
-              setTagsDraft(e.target.value);
-              handleChange('tags', parseTags(e.target.value));
-            }}
-            placeholder="例如：写实, 插画, 人像, 特写, 雨夜…"
-          />
+        {/* Tags & Notes */}
+        <div className="space-y-3 pt-2 border-t border-white/5">
+          <div className="space-y-1.5">
+             <label className="text-xs font-semibold text-muted-foreground">Tags</label>
+             <Input
+                value={tagsDraft}
+                onChange={(e) => {
+                  setTagsDraft(e.target.value);
+                  handleChange('tags', parseTags(e.target.value));
+                }}
+                placeholder="e.g. realistic, portrait..."
+                className="h-8 bg-secondary/20 border-transparent rounded-lg text-xs"
+              />
+          </div>
+          <div className="space-y-1.5">
+             <label className="text-xs font-semibold text-muted-foreground">Notes</label>
+             <textarea
+                className="w-full min-h-[60px] rounded-lg border-transparent bg-secondary/20 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                value={String(formData.notes || '')}
+                onChange={(e) => handleChange('notes', e.target.value)}
+                placeholder="Notes about this variation..."
+              />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">分支说明 / 备注（可选）</label>
-          <textarea
-            className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-            value={String(formData.notes || '')}
-            onChange={(e) => handleChange('notes', e.target.value)}
-            placeholder="这条分支想探索什么变化？例如：从写实→插画 / 全身像→特写 / 白天→雨夜…"
-          />
-        </div>
-
-        {/* 快速分支 - 核心功能突出显示 */}
-        <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-b from-primary/5 to-transparent p-3 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
+        {/* 快速分支 - Modern Card */}
+        <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/10 p-4 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shadow-inner">
               <GitBranch className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <div className="text-sm font-semibold">从这里继续</div>
-              <div className="text-[11px] text-muted-foreground">点击快速分支或输入自定义变化</div>
+              <div className="text-sm font-bold text-primary">Quick Branch</div>
             </div>
           </div>
           
-          {/* 快速分支建议 */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {quickBranchPresets.map((s, i) => (
               <button
                 key={`${s.label}-${s.value}-${i}`}
-                className="px-2.5 py-1 rounded-full border border-border bg-card text-xs hover:border-primary/40 hover:bg-primary/10 transition-colors"
+                className="px-3 py-1.5 rounded-full bg-background/50 border border-primary/10 text-xs font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all active:scale-95"
                 onClick={() => {
                   const basePrompt = String(formData.prompt || '').trim();
                   if (!basePrompt) {
-                    toast.error('请先填写提示词');
+                    toast.error('Please enter a prompt first');
                     return;
                   }
                   const nextPrompt = `${basePrompt}, ${s.value}`;
@@ -1044,46 +788,45 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
             ))}
           </div>
 
-          {/* 自定义分支输入 */}
-          <div className="space-y-2">
+          <div className="relative">
             <Input
-              className="h-9 text-xs"
-              placeholder="输入自定义变化，如：赛博朋克风格"
+              className="h-10 pl-3 pr-16 bg-background/60 border-primary/10 rounded-xl text-xs backdrop-blur-sm focus:bg-background"
+              placeholder="Custom variation..."
               value={customBranchInput}
               onChange={(e) => setCustomBranchInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && customBranchInput.trim()) {
-                  e.preventDefault();
-                  const basePrompt = String(formData.prompt || '').trim();
-                  if (!basePrompt) {
-                    toast.error('请先填写提示词');
-                    return;
-                  }
-                  const nextPrompt = `${basePrompt}, ${customBranchInput.trim()}`;
-                  void (async () => {
-                    const newIds = await generateFromNode(nodeId, {
-                      mode: 'append',
-                      overrides: { prompt: nextPrompt, notes: customBranchInput.trim() },
-                    });
-                    if (newIds?.[0]) onFocusNode?.(newIds[0]);
-                    setCustomBranchInput('');
-                  })();
+                   // ... logic ...
+                   const basePrompt = String(formData.prompt || '').trim();
+                    if (!basePrompt) {
+                      toast.error('Please enter a prompt first');
+                      return;
+                    }
+                    const nextPrompt = `${basePrompt}, ${customBranchInput.trim()}`;
+                    if (!nodeId) return;
+                    void (async () => {
+                      const newIds = await generateFromNode(nodeId, {
+                        mode: 'append',
+                        overrides: { prompt: nextPrompt, notes: customBranchInput.trim() },
+                      });
+                      if (newIds?.[0]) onFocusNode?.(newIds[0]);
+                      setCustomBranchInput('');
+                    })();
                 }
               }}
             />
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                size="sm"
-                className="h-9"
-                disabled={!customBranchInput.trim()}
-                onClick={() => {
+            <Button
+              size="sm"
+              className="absolute right-1 top-1 h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider"
+              disabled={!customBranchInput.trim()}
+              onClick={() => {
                   const basePrompt = String(formData.prompt || '').trim();
                   if (!basePrompt) {
-                    toast.error('请先填写提示词');
+                    toast.error('Please enter a prompt first');
                     return;
                   }
                   const nextPrompt = `${basePrompt}, ${customBranchInput.trim()}`;
+                  if (!nodeId) return;
                   void (async () => {
                     const newIds = await generateFromNode(nodeId, {
                       mode: 'append',
@@ -1092,129 +835,72 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                     if (newIds?.[0]) onFocusNode?.(newIds[0]);
                     setCustomBranchInput('');
                   })();
-                }}
-              >
-                分支
-              </Button>
-
-              <Button
-                size="sm"
-                className="h-9 bg-primary hover:bg-primary/90"
-                onClick={handleContinue}
-                disabled={continuing}
-              >
-                {continuing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    继续生成中…
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    继续生成（新节点）
-                  </>
-                )}
-              </Button>
-            </div>
+              }}
+            >
+              GO
+            </Button>
           </div>
         </div>
 
-        {/* Generation config */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">张数</label>
-            <Input
-              type="number"
-              min={1}
-              max={8}
-              value={Number(formData.count || 1)}
-              onChange={(e) => handleChange('count', Number(e.target.value) || 1)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">尺寸</label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={(formData.imageSize as any) || '2K'}
-              onChange={(e) => handleChange('imageSize', e.target.value)}
-            >
-              {IMAGE_SIZE_OPTIONS.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">比例</label>
-            <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              value={(formData.aspectRatio as any) || 'auto'}
-              onChange={(e) => handleChange('aspectRatio', e.target.value)}
-            >
-              {ASPECT_RATIO_OPTIONS.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">继续模式</label>
-          <select
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={String(formData.generationBaseMode || '')}
-            onChange={(e) => {
-              const v = String(e.target.value || '').trim();
-              handleChange('generationBaseMode', v === 'prompt' ? 'prompt' : v === 'image' ? 'image' : undefined);
-            }}
+        {/* Actions Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button 
+            className="h-10 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            onClick={handleGenerate} 
+            disabled={generating || regenerating}
           >
-            <option value="">默认（跟随设置）</option>
-            <option value="image">基于当前图</option>
-            <option value="prompt">纯提示词</option>
-          </select>
-          <div className="text-[11px] text-muted-foreground">
-            默认值可在设置中调整；也可以在单个节点上覆盖默认行为。
-          </div>
+            {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4 fill-current" />}
+            Generate
+          </Button>
+          <Button 
+            variant="secondary" 
+            className="h-10 rounded-xl bg-secondary/50 hover:bg-secondary font-medium"
+            onClick={handleSave}
+          >
+            Save Changes
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-10 rounded-xl border-white/10 hover:bg-white/5"
+            onClick={handleRegenerate} 
+            disabled={generating || regenerating}
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Regenerate
+          </Button>
+          <Button 
+            variant="outline" 
+            className="h-10 rounded-xl border-white/10 hover:bg-white/5"
+            onClick={() => duplicateNode(nodeId)}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Duplicate
+          </Button>
         </div>
 
-        {/* Version history */}
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-medium">历史版本</div>
-            <div className="text-[11px] text-muted-foreground">{revisions.length ? `${revisions.length} 条` : '暂无'}</div>
+        {/* History List */}
+        <div className="space-y-2 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Versions</label>
+            <span className="text-[10px] text-muted-foreground bg-secondary/30 px-1.5 py-0.5 rounded">{revisions.length}</span>
           </div>
-
-          {revisions.length ? (
+          {revisions.length > 0 ? (
             <div className="space-y-2">
-              {revisions.slice(0, 8).map((rev) => (
-                <div
-                  key={rev.id}
-                  className="rounded-md border border-border bg-background px-3 py-2"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-muted-foreground">
-                        {new Date(rev.createdAt).toLocaleString()}{' '}
-                        {rev.source ? `· ${REV_SOURCE_LABEL[rev.source] || rev.source}` : ''}
+              {revisions.slice(0, 5).map((rev) => (
+                <div key={rev.id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/10 hover:bg-secondary/30 transition-colors group">
+                   <div className="min-w-0 flex-1">
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                         <span>{new Date(rev.createdAt).toLocaleTimeString()}</span>
+                         <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                         <span>{rev.imageSize}</span>
                       </div>
-                      <div className="text-xs text-foreground/90 line-clamp-2 mt-0.5">
-                        {rev.prompt || '（空提示词）'}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground mt-1">
-                        {rev.imageSize} · {rev.aspectRatio} · {rev.count} 张
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 px-3"
-                        disabled={isNodeBusy || generating}
-                        onClick={() => {
+                      <div className="text-xs truncate opacity-70 mt-0.5">{rev.prompt}</div>
+                   </div>
+                   <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
                           restoreNodeRevision(nodeId, rev.id);
                           setFormData((prev) => ({
                             ...prev,
@@ -1223,47 +909,20 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                             imageSize: rev.imageSize,
                             aspectRatio: rev.aspectRatio,
                           }));
-                          toast.success('已还原到历史版本');
-                        }}
-                      >
-                        还原
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-8 px-3"
-                        disabled={isNodeBusy || generating}
-                        onClick={async () => {
-                          setGenerating(true);
-                          try {
-                            restoreNodeRevision(nodeId, rev.id);
-                            setFormData((prev) => ({
-                              ...prev,
-                              prompt: rev.prompt,
-                              count: rev.count,
-                              imageSize: rev.imageSize,
-                              aspectRatio: rev.aspectRatio,
-                            }));
-                            const newIds = await generateFromNode(nodeId, { mode: 'append' });
-                            if (newIds?.[0]) onFocusNode?.(newIds[0]);
-                          } finally {
-                            setGenerating(false);
-                          }
-                        }}
-                      >
-                        还原并生成
-                      </Button>
-                    </div>
-                  </div>
+                          toast.success('Restored');
+                      }}
+                      title="Restore"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                   </Button>
                 </div>
               ))}
-              {revisions.length > 8 ? (
-                <div className="text-[11px] text-muted-foreground">还有 {revisions.length - 8} 条历史版本…</div>
-              ) : null}
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground">在当前节点内修改提示词/参数后，会自动记录历史。</div>
+            <div className="text-xs text-muted-foreground/50 italic">No history yet</div>
           )}
         </div>
+
 
         {/* Relations */}
         <div className="rounded-lg border border-border bg-card p-3 space-y-2">
@@ -1325,276 +984,42 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
           )}
         </div>
 
-        {/* Actions - 精简布局 */}
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={handleSave}>
-            保存修改
-          </Button>
-          <Button onClick={handleGenerate} disabled={generating || regenerating}>
-            {generating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                生成中…
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4 fill-current" />
-                生成
-              </>
-            )}
-          </Button>
-          <Button variant="outline" onClick={handleRegenerate} disabled={generating || regenerating}>
-            {regenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                重新生成中…
-              </>
-            ) : (
-              <>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                重新生成
-              </>
-            )}
-          </Button>
-          <Button variant="outline" onClick={() => duplicateNode(nodeId)}>
-            <Copy className="mr-2 h-4 w-4" />
-            复制节点
-          </Button>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-medium">批量分叉</div>
-            <div className="flex items-center gap-2">
-              <select
-                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                value={batchConcurrency}
-                onChange={(e) => setBatchConcurrency(Number(e.target.value) as any)}
-                title="并发数"
-              >
-                {CONCURRENCY_OPTIONS.map((v) => (
-                  <option key={v} value={v}>
-                    并发 {v}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <textarea
-            className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-            value={batchBranchDraft}
-            onChange={(e) => setBatchBranchDraft(e.target.value)}
-            placeholder={`每行一个变化，例如：\n插画风\n特写镜头\n雨夜霓虹`}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              onClick={() => void handleBatchBranch(false)}
-              disabled={batchBranching || !batchBranchDraft.trim()}
-            >
-              {batchBranching ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  处理中…
-                </>
-              ) : (
-                <>
-                  <GitBranch className="mr-2 h-4 w-4" />
-                  只创建
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={() => void handleBatchBranch(true)}
-              disabled={batchBranching || !batchBranchDraft.trim()}
-            >
-              {batchBranching ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  创建并生成…
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4 fill-current" />
-                  创建并生成
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={handleAnalyzePrompt} disabled={analyzingPrompt}>
-            {analyzingPrompt ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                分析中…
-              </>
-            ) : (
-              <>
-                <Wand2 className="mr-2 h-4 w-4" />
-                分析提示词
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              savePromptToLibrary(nodeId);
-            }}
-          >
-            <BookMarked className="mr-2 h-4 w-4" />
-            存入提示词库
-          </Button>
-        </div>
-
-        {/* Prompt analysis */}
-        {selectedNode.data.promptAnalysis?.raw ? (
-          <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-medium">提示词分析</div>
-              {promptSuggestion.suggestedPrompt ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-8"
-                  onClick={() => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      prompt: promptSuggestion.suggestedPrompt,
-                    }));
-                    toast.success('已填入建议提示词');
-                  }}
-                >
-                  应用建议
-                </Button>
-              ) : null}
-            </div>
-            <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{selectedNode.data.promptAnalysis.raw}</pre>
-            {promptSuggestion.suggestedPrompt ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  branchNode(nodeId, {
-                    prompt: promptSuggestion.suggestedPrompt,
-                  } as Partial<NodeData>);
-                }}
-              >
-                <GitBranch className="mr-2 h-4 w-4" />
-                用建议创建分支
-              </Button>
-            ) : null}
-            {promptSuggestion.suggestedPrompt ? (
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={async () => {
-                  setContinuing(true);
-                  try {
-                    const newIds = await generateFromNode(nodeId, {
-                      mode: 'append',
-                      overrides: { prompt: promptSuggestion.suggestedPrompt } as Partial<NodeData>,
-                    });
-                    if (newIds?.[0]) onFocusNode?.(newIds[0]);
-                  } finally {
-                    setContinuing(false);
-                  }
-                }}
-              >
-                <GitBranch className="mr-2 h-4 w-4" />
-                用建议继续生成（新节点）
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Images */}
-        <div className="space-y-2">
+        {/* Images Section */}
+        <div className="space-y-3 pt-4 border-t border-white/5">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <ImageIcon className="h-4 w-4 text-emerald-400" />
-              生成结果
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <ImageIcon className="h-3.5 w-3.5 text-emerald-400" />
+              Generated Images
             </label>
             <div className="flex items-center gap-2">
-              <select
-                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                value={prefs.continueFromImageMode}
-                onChange={(e) =>
-                  updatePrefs({
-                    continueFromImageMode: (e.target.value === 'multi_turn' ? 'multi_turn' : 'image_only') as any,
-                  })
-                }
-                title="继续生成模式"
-              >
-                <option value="image_only">仅发送该图</option>
-                <option value="multi_turn">多轮对话（含历史）</option>
-              </select>
-              {prefs.continueFromImageMode === 'multi_turn' ? (
-                <select
-                  className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                  value={prefs.continueHistoryNodes}
-                  onChange={(e) => updatePrefs({ continueHistoryNodes: Number(e.target.value) })}
-                  title="发送的历史节点数"
-                >
-                  {[2, 3, 4, 6, 8, 10, 12].map((v) => (
-                    <option key={v} value={v}>
-                      历史 {v} 节点
-                    </option>
-                  ))}
-                </select>
+              {activeImageId ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] rounded-lg border-white/10"
+                    onClick={handleContinueFromImage}
+                    disabled={continuingFromImage}
+                  >
+                    {continuingFromImage ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <GitBranch className="h-3 w-3 mr-1" />
+                    )}
+                    Continue
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[10px] rounded-lg border-white/10"
+                    onClick={() => setAiChatOpen(true)}
+                    title="AI Chat"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    AI Chat
+                  </Button>
+                </>
               ) : null}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-                onClick={handleContinueFromImage}
-                disabled={!activeImageId || continuingFromImage}
-                title="从当前选中的图片继续生成一个新分支节点"
-              >
-                {continuingFromImage ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    继续中…
-                  </>
-                ) : (
-                  <>
-                    <GitBranch className="mr-2 h-4 w-4" />
-                    基于图继续
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-                onClick={handleAnalyzeImage}
-                disabled={!activeImageId || analyzingImage}
-              >
-                {analyzingImage ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    分析中…
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="mr-2 h-4 w-4" />
-                    分析图片
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-                onClick={() => setAiChatOpen(true)}
-                disabled={!activeImageId}
-                title="对当前图片开启 AI 对话（分析模型）"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                AI对话
-              </Button>
             </div>
           </div>
           {selectedNode.data.images?.length ? (
@@ -1603,120 +1028,52 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
                 <button
                   key={img.id}
                   className={cn(
-                    'relative aspect-square rounded-lg overflow-hidden border',
-                    activeImageId === img.id ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                    'relative aspect-square rounded-xl overflow-hidden border-2 transition-all',
+                    activeImageId === img.id 
+                      ? 'border-primary ring-2 ring-primary/20 scale-[1.02]' 
+                      : 'border-white/5 hover:border-white/20'
                   )}
                   onClick={() => setActiveImageId(img.id)}
-                  title="选择图片"
                 >
                   <ResolvedImage src={img.url} alt={img.id} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
           ) : (
-            <div className="w-full aspect-[2/1] rounded-lg border border-dashed border-border bg-background flex flex-col items-center justify-center text-muted-foreground gap-2">
-              <ImageIcon className="h-8 w-8 opacity-30" />
-              <span className="text-xs opacity-60">暂无图片</span>
+            <div className="w-full aspect-[2/1] rounded-xl border-2 border-dashed border-white/10 bg-secondary/10 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <ImageIcon className="h-6 w-6 opacity-20" />
+              <span className="text-xs opacity-40">No images yet</span>
             </div>
           )}
         </div>
 
-        {/* Image analysis */}
-        {imageAnalysis?.raw ? (
-          <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-            <div className="text-sm font-medium">图片分析</div>
-            <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{imageAnalysis.raw}</pre>
-            {imageSuggestion.suggestedPrompt ? (
-              <div className="space-y-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    if (!nodeId) return;
-                    const newId = branchNode(nodeId, { prompt: imageSuggestion.suggestedPrompt } as Partial<NodeData>);
-                    if (newId) onFocusNode?.(newId);
-                  }}
-                >
-                  <GitBranch className="mr-2 h-4 w-4" />
-                  用图片建议创建分支
-                </Button>
-                <Button
-                  size="sm"
-                  className="w-full"
-                  onClick={async () => {
-                    if (!nodeId || !activeImageId) return;
-                    setContinuingFromImage(true);
-                    try {
-                      const newIds = await generateFromNode(nodeId, {
-                        mode: 'append',
-                        overrides: {
-                          prompt: imageSuggestion.suggestedPrompt,
-                          generationBaseMode: 'image',
-                          referenceImageId: activeImageId,
-                        } as Partial<NodeData>,
-                      });
-                      if (newIds?.[0]) onFocusNode?.(newIds[0]);
-                    } finally {
-                      setContinuingFromImage(false);
-                    }
-                  }}
-                  disabled={continuingFromImage}
-                >
-                  <GitBranch className="mr-2 h-4 w-4" />
-                  用图片建议继续生成（基于图）
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Prompt library */}
-        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
-          <div className="text-sm font-medium flex items-center gap-2">
-            <BookMarked className="h-4 w-4 text-primary/80" />
-            提示词库
-          </div>
-          {promptLibrary.length ? (
-            <div className="space-y-2">
-              {promptLibrary.slice(0, 8).map((p) => (
-                <div key={p.id} className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs text-foreground/90 truncate">{p.title || p.prompt}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">{p.prompt}</div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-8 shrink-0"
-                    onClick={() => applyPromptAssetToNode(p.id, nodeId)}
-                  >
-                    应用
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground">暂无收藏的提示词</div>
-          )}
+        {/* Footer Actions */}
+        <div className="pt-4 border-t border-white/5 space-y-2">
+          <Button
+            variant="outline"
+            className="w-full h-9 rounded-xl border-white/10 text-xs font-medium hover:bg-white/5"
+            onClick={() => {
+              savePromptToLibrary(nodeId);
+              toast.success('Saved to library');
+            }}
+          >
+            <BookMarked className="mr-2 h-3.5 w-3.5" />
+            Save to Library
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full h-9 rounded-xl text-xs font-medium text-red-400/80 hover:text-red-400 hover:bg-red-500/10"
+            onClick={() => {
+              if (!confirm('Delete this node?')) return;
+              removeNode(nodeId);
+              clearSelection();
+              toast.success('Node deleted');
+            }}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Delete Node
+          </Button>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="p-4 border-t border-border bg-card">
-        <Button
-          variant="destructive"
-          className="w-full"
-          onClick={() => {
-            if (!confirm('确定删除这个节点吗？')) return;
-            removeNode(nodeId);
-            clearSelection();
-            toast.success('节点已删除');
-          }}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          删除节点
-        </Button>
       </div>
 
       {nodeId && activeImageId ? (
@@ -1727,55 +1084,52 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
 }
 
 export default function Sidebar(props: SidebarProps) {
-  // 移动端检测
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const [isCollapsed, setIsCollapsed] = useState(isMobile); // 移动端默认收起
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className={cn(
-      "flex flex-col shrink-0 z-40",
-      isMobile ? "absolute right-0 top-0 bottom-0 h-full pointer-events-none" : "relative h-full"
-    )}>
-      {/* 折叠按钮 */}
+    <>
+      {/* 折叠/展开按钮 - 独立悬浮 */}
       <div
         className={cn(
-          "absolute top-1/2 z-50 transition-all duration-300 pointer-events-auto",
-          isCollapsed ? (isMobile ? "right-0" : "-left-6") : (isMobile ? "right-[85vw] md:right-[380px]" : "-left-3")
+          "absolute z-50 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          isCollapsed 
+            ? "right-4 top-4" 
+            : "right-[400px] top-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 pointer-events-none hover:pointer-events-auto"
         )}
-        style={{ transform: 'translateY(-50%)' }}
       >
         <Button
           variant="secondary"
           size="icon"
           className={cn(
-            "h-12 w-8 border-border shadow-md border bg-card hover:bg-accent text-muted-foreground",
-            isMobile 
-              ? (isCollapsed ? "rounded-l-xl border-r-0" : "rounded-r-xl border-l-0") 
-              : "rounded-l-md rounded-r-none border-r-0 h-8 w-6"
+            "h-10 w-10 rounded-full shadow-lg border border-white/10 bg-card/80 backdrop-blur-md hover:bg-card hover:scale-105 transition-all",
+            !isCollapsed && "translate-x-1/2"
           )}
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
         >
-          {isCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          {isCollapsed ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
         </Button>
       </div>
       
-      {/* 侧边栏主体 */}
+      {/* 侧边栏主体 - Floating Panel */}
       <div 
         className={cn(
-          "h-full bg-background border-l border-border transition-[width,transform] duration-300 ease-in-out overflow-hidden pointer-events-auto shadow-2xl",
-          isCollapsed ? "w-0 border-l-0" : "w-[85vw] md:w-[380px]"
+          "absolute top-4 bottom-4 right-4 z-40 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col",
+          "pointer-events-none", // Wrapper allows clicks to pass through outside
+          isCollapsed ? "translate-x-[calc(100%+24px)] opacity-0" : "translate-x-0 opacity-100"
         )}
       >
         <div 
           className={cn(
-            "h-full flex flex-col w-[85vw] md:w-[380px]",
-            isCollapsed && "invisible"
+            "w-[380px] h-full flex flex-col",
+            "bg-card/85 backdrop-blur-2xl backdrop-saturate-150",
+            "border border-white/10 dark:border-white/5 shadow-2xl shadow-black/10",
+            "rounded-[28px] overflow-hidden pointer-events-auto ring-1 ring-black/5"
           )}
         >
            <SidebarContent {...props} />
         </div>
       </div>
-    </div>
+    </>
   );
 }
