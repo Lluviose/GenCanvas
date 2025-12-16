@@ -1,6 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
+  Layers, 
   FolderKanban, 
   Image,
   SlidersHorizontal,
@@ -8,8 +9,7 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Aperture,
-  ArrowLeft
+  Aperture
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ const navItems = [
 
 export default function Header() {
   const location = useLocation();
+  const { projectId } = useParams();
   const { theme, setTheme } = useThemeStore();
   
   // 在画布页面隐藏导航（使用更沉浸式的体验）
@@ -91,11 +92,11 @@ export default function Header() {
       <div className={cn("flex items-center gap-2 pointer-events-auto", isCanvasPage && "bg-background/60 backdrop-blur-xl backdrop-saturate-150 rounded-full p-1.5 border border-border/40 shadow-sm")}>
         {isCanvasPage && (
           <Link 
-            to="/projects" 
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all"
+            to={projectId ? `/projects/${projectId}/canvases` : "/projects"}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">返回</span>
+            <Layers className="w-4 h-4" />
+            <span className="hidden sm:inline">返回项目</span>
           </Link>
         )}
 
