@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
-  Layers, 
   FolderKanban, 
   Image,
   SlidersHorizontal,
@@ -9,7 +8,8 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Aperture
+  Aperture,
+  ArrowLeft
 } from 'lucide-react';
 import { useThemeStore } from '@/store/themeStore';
 import { Button } from '@/components/ui/button';
@@ -92,10 +92,10 @@ export default function Header() {
         {isCanvasPage && (
           <Link 
             to="/projects" 
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all"
           >
-            <Layers className="w-4 h-4" />
-            <span className="hidden sm:inline">返回项目</span>
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">返回</span>
           </Link>
         )}
 

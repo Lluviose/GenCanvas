@@ -30,7 +30,7 @@ const ACCENT_STORAGE_KEY = 'photopro:accent-color';
 const CUSTOM_ACCENT_STORAGE_KEY = 'photopro:custom-accent-color';
 
 const getInitialTheme = (): Theme => {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === 'light' || stored === 'dark') {
@@ -39,7 +39,7 @@ const getInitialTheme = (): Theme => {
   } catch {
     // ignore
   }
-  return 'dark';
+  return 'light';
 };
 
 const getInitialAccentColor = (): AccentColorId => {
