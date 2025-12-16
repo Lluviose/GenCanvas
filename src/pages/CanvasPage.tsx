@@ -8,7 +8,8 @@ import ReactFlow, {
   ReactFlowProvider,
   Panel,
   BackgroundVariant,
-  ConnectionMode
+  ConnectionMode,
+  PanOnScrollMode
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useCanvasStore, AppNode } from '@/store/canvasStore';
@@ -85,7 +86,9 @@ function CanvasContent() {
   }, [canvases, canvasId]);
 
   const { project, zoomIn, zoomOut, fitView, getNode } = useReactFlow();
-  const [isPanMode, setIsPanMode] = useState(false);
+  // Detect mobile to set default interaction mode
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || 'ontouchstart' in window);
+  const [isPanMode, setIsPanMode] = useState(isMobile); // Default to pan mode on mobile
     const [zoomTier, setZoomTier] = useState<'high' | 'medium' | 'low'>('high');
 
   const onMove = useCallback((_: any, viewport: { zoom: number }) => {
@@ -550,6 +553,9 @@ function CanvasContent() {
           onDoubleClick={onDoubleClick}
           panOnDrag={isPanMode}
           selectionOnDrag={!isPanMode}
+          panOnScroll={!isMobile} 
+          zoomOnPinch={true}
+          panOnScrollMode={PanOnScrollMode.Free}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           className={cn("bg-background", `zoom-level-${zoomTier}`)}
@@ -574,7 +580,7 @@ function CanvasContent() {
           />
           
           {/* 左上角工具栏 - 返回按钮 + 状态显示 */}
-          <Panel position="top-left" className="!m-4">
+          <Panel position="top-left" className="!m-4 z-30">
             <div className="flex items-start gap-2">
               {/* 返回按钮 */}
               <Link
@@ -626,7 +632,7 @@ function CanvasContent() {
           </Panel>
 
           {/* 右上角控制栏 */}
-          <Panel position="top-right" className="!m-4">
+          <Panel position="top-right" className="!m-4 z-30">
             <div className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-1.5 shadow-xl flex items-center gap-1">
               <Button
                 size="sm"

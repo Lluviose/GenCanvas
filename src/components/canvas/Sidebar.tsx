@@ -1727,21 +1727,32 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
 }
 
 export default function Sidebar(props: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // 移动端检测
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const [isCollapsed, setIsCollapsed] = useState(isMobile); // 移动端默认收起
 
   return (
-    <div className="relative h-full flex flex-col shrink-0">
+    <div className={cn(
+      "flex flex-col shrink-0 z-40",
+      isMobile ? "absolute right-0 top-0 bottom-0 h-full pointer-events-none" : "relative h-full"
+    )}>
+      {/* 折叠按钮 */}
       <div
         className={cn(
-          "absolute top-1/2 z-10 transition-all duration-300",
-          isCollapsed ? "-left-6" : "-left-3"
+          "absolute top-1/2 z-50 transition-all duration-300 pointer-events-auto",
+          isCollapsed ? (isMobile ? "right-0" : "-left-6") : (isMobile ? "right-[85vw] md:right-[380px]" : "-left-3")
         )}
         style={{ transform: 'translateY(-50%)' }}
       >
         <Button
           variant="secondary"
           size="icon"
-          className="h-8 w-6 border-border shadow-sm rounded-l-md rounded-r-none border border-r-0"
+          className={cn(
+            "h-12 w-8 border-border shadow-md border bg-card hover:bg-accent text-muted-foreground",
+            isMobile 
+              ? (isCollapsed ? "rounded-l-xl border-r-0" : "rounded-r-xl border-l-0") 
+              : "rounded-l-md rounded-r-none border-r-0 h-8 w-6"
+          )}
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
         >
@@ -1749,16 +1760,17 @@ export default function Sidebar(props: SidebarProps) {
         </Button>
       </div>
       
+      {/* 侧边栏主体 */}
       <div 
         className={cn(
-          "h-full bg-background border-l border-border transition-[width] duration-300 ease-in-out overflow-hidden",
-          isCollapsed ? "w-0 border-l-0" : "w-[380px]"
+          "h-full bg-background border-l border-border transition-[width,transform] duration-300 ease-in-out overflow-hidden pointer-events-auto shadow-2xl",
+          isCollapsed ? "w-0 border-l-0" : "w-[85vw] md:w-[380px]"
         )}
       >
         <div 
           className={cn(
-            "w-[380px] h-full flex flex-col",
-            isCollapsed && "invisible pointer-events-none"
+            "h-full flex flex-col w-[85vw] md:w-[380px]",
+            isCollapsed && "invisible"
           )}
         >
            <SidebarContent {...props} />
