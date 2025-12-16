@@ -131,6 +131,8 @@ export default function GalleryPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [aiTaggingImageId, setAiTaggingImageId] = useState<string | null>(null);
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+  const [batchAnalyzingProgress, setBatchAnalyzingProgress] = useState({ current: 0, total: 0 });
 
   const [promptSearch, setPromptSearch] = useState('');
   const [promptSort, setPromptSort] = useState<PromptSortMode>('updated');
@@ -427,6 +429,30 @@ export default function GalleryPage() {
     }
   };
 
+  const unanalyzedImages = useMemo(
+    () => images.filter((img) => typeof img.aiOverallScore !== 'number'),
+    [images]
+  );
+
+  const handleBatchAnalyze = async () => {
+    if (batchAnalyzing || unanalyzedImages.length === 0) return;
+    setBatchAnalyzing(true);
+    setBatchAnalyzingProgress({ current: 0, total: unanalyzedImages.length });
+    let success = 0;
+    for (let i = 0; i < unanalyzedImages.length; i++) {
+      const img = unanalyzedImages[i];
+      setBatchAnalyzingProgress({ current: i + 1, total: unanalyzedImages.length });
+      try {
+        await autoTagGalleryImage(img.id, { silent: true });
+        success += 1;
+      } catch (error) {
+        console.error('Batch analyze failed for', img.id, error);
+      }
+    }
+    setBatchAnalyzing(false);
+    toast.success(`批量分析完成，成功 ${success} / ${unanalyzedImages.length} 张`);
+  };
+
   const handleConfirmDeletePrompt = () => {
     if (!pendingDeletePromptId) return;
     deletePromptAsset(pendingDeletePromptId);
@@ -449,6 +475,26 @@ export default function GalleryPage() {
               </Button>
             ) : (
               <>
+                {unanalyzedImages.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleBatchAnalyze}
+                    disabled={batchAnalyzing}
+                    title={`分析 ${unanalyzedImages.length} 张未分析的图片`}
+                  >
+                    {batchAnalyzing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {batchAnalyzingProgress.current}/{batchAnalyzingProgress.total}
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        AI 分析 ({unanalyzedImages.length})
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   variant={selectMode ? 'secondary' : 'outline'}
                   onClick={() => {
@@ -934,16 +980,16 @@ export default function GalleryPage() {
       {/* Image preview */}
       <Dialog open={Boolean(selectedImage)} onOpenChange={(open) => (!open ? setSelectedImage(null) : null)}>
         <DialogContent
-          className="max-w-5xl w-[min(96vw,1040px)] p-0 overflow-hidden"
+          className="max-w-5xl w-[min(96vw,1040px)] p-0 max-h-[90vh] overflow-y-auto"
           onClose={() => setSelectedImage(null)}
         >
           {selectedImage ? (
             <div className="grid grid-cols-1 md:grid-cols-2">
-              <div className="bg-black/80 flex items-center justify-center p-2">
+              <div className="bg-black/80 flex items-center justify-center p-2 min-h-[200px] md:min-h-0 sticky top-0 md:static z-10">
                 <img
                   src={selectedImage.url}
                   alt={selectedImage.id}
-                  className="w-full h-full max-h-[70vh] object-contain rounded-lg"
+                  className="w-full h-auto max-h-[40vh] md:max-h-[70vh] object-contain rounded-lg"
                 />
               </div>
               <div className="p-6 space-y-4">

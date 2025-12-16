@@ -67,6 +67,7 @@ export default function SettingsPage() {
       aiChatMaxMessages,
       aiChatSystemPrompt: String(draft.aiChatSystemPrompt || '').trim().slice(0, 2000),
       aiChatPresets: cleanedAiChatPresets,
+      aiImageAnalysisPrompt: String(draft.aiImageAnalysisPrompt || '').trim().slice(0, 4000),
     });
     toast.success('已保存');
   };
@@ -466,6 +467,19 @@ export default function SettingsPage() {
                   onChange={(e) => handleChange('aiImageHighQualityThreshold', Number(e.target.value))}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <label className="text-sm font-medium">图片分析/打分提示词（可选）</label>
+              <textarea
+                className="w-full min-h-[120px] rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                value={String(draft.aiImageAnalysisPrompt || '')}
+                onChange={(e) => handleChange('aiImageAnalysisPrompt', e.target.value)}
+                placeholder="留空使用默认提示词。自定义时需要求 AI 输出 JSON 格式，包含 caption、overallScore、aestheticScore、promptAlignment.score、tags 等字段。"
+              />
+              <p className="text-xs text-muted-foreground">
+                用于「AI 分析」功能。留空则使用内置默认提示词，自定义时请确保输出 JSON 结构包含 overallScore (0-100)、tags 等字段。
+              </p>
             </div>
 
             <div className="space-y-2 pt-2 border-t border-border">

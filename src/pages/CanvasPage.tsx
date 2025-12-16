@@ -535,7 +535,7 @@ function CanvasContent() {
 
   return (
     <div className="flex h-full w-full">
-      <div className="flex-1 h-full relative">
+      <div className="flex-1 h-full relative touch-none">
         <ReactFlow
           nodes={nodes}
           edges={edges}

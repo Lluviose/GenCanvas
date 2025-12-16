@@ -41,6 +41,7 @@ export interface WorkbenchPreferences {
   aiChatMaxMessages: number;
   aiChatSystemPrompt: string;
   aiChatPresets: AiChatPreset[];
+  aiImageAnalysisPrompt: string;
 }
 
 const STORAGE_KEY = 'photopro:workbench-preferences';
@@ -98,6 +99,7 @@ const DEFAULT_PREFS: WorkbenchPreferences = {
         '请基于当前图片，给出 5 条不同方向的可控变体（每条包含：变化目标 + 可直接追加的短 prompt），例如：特写/远景/写实/插画/雨夜等。',
     },
   ],
+  aiImageAnalysisPrompt: '',
 };
 
 const loadFromStorage = (): WorkbenchPreferences | null => {
@@ -169,6 +171,12 @@ const loadFromStorage = (): WorkbenchPreferences | null => {
           .slice(0, 24)
       : DEFAULT_PREFS.aiChatPresets;
 
+    const aiImageAnalysisPromptRaw = (parsed as any)?.aiImageAnalysisPrompt;
+    const aiImageAnalysisPrompt =
+      typeof aiImageAnalysisPromptRaw === 'string'
+        ? aiImageAnalysisPromptRaw.trim().slice(0, 4000)
+        : DEFAULT_PREFS.aiImageAnalysisPrompt;
+
     return {
       ...DEFAULT_PREFS,
       ...parsed,
@@ -188,6 +196,7 @@ const loadFromStorage = (): WorkbenchPreferences | null => {
       aiChatMaxMessages,
       aiChatSystemPrompt,
       aiChatPresets,
+      aiImageAnalysisPrompt,
     };
   } catch {
     return null;

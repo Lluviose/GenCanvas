@@ -11,6 +11,7 @@ import type {
 } from '@/types/workbench';
 import type { Base64Image } from '@/types/media';
 import { getWorkbenchSettings } from '@/store/workbenchSettingsStore';
+import { getPreferences } from '@/store/preferencesStore';
 
 const API_TIMEOUT_MS = 300_000;
 const GENERATION_MIN_INTERVAL_MS = 1000;
@@ -648,8 +649,41 @@ export const analyzeImage = async (payload: WorkbenchAnalyzeImageRequest): Promi
     analysisConfig.openaiModel = analysisConfig.model;
   }
 
-  const instruction =
-    '你是一个面向“文生图创作”的图片结果分析器。请结合（可选的）提示词与图片内容，输出严格的 JSON（不要 Markdown、不要代码块），结构如下：\n{\n  "caption": string,\n  "overallScore": number,\n  "aestheticScore": number,\n  "promptAlignment": { "score": number, "notes": string },\n  "strengths": string[],\n  "issues": string[],\n  "suggestedPrompt": string,\n  "suggestedNegativePrompt": string,\n  "tags": string[]\n}\n要求：用中文；overallScore/aestheticScore/score 均取 0-100；suggestedPrompt 要可直接用于文生图；若无 negativePrompt 建议则输出空字符串。';
+  const defaultInstruction = `你是一个专业且严格的文生图结果分析器。请结合（可选的）提示词与图片内容，进行严格评估。
+
+【评分标准 - 请严格执行】
+- 90-100：商业级作品，可直接用于出版/广告，几乎无瑕疵
+- 80-89：高质量作品，仅有微小可忽略的问题
+- 70-79：良好作品，有一些小问题但整体不错
+- 60-69：及格作品，存在明显问题但基本可用
+- 40-59：较差作品，有较多问题需要修改
+- 20-39：差作品，问题严重，需要重新生成
+- 0-19：失败作品，完全不可用
+
+【常见扣分项】
+- 人物：手指畸形(-15)、面部扭曲(-20)、肢体比例失调(-10)、多余肢体(-25)
+- 文字：乱码/错字(-10)、文字扭曲(-5)
+- 构图：主体不清晰(-10)、画面杂乱(-8)、裁切不当(-5)
+- 细节：模糊失焦(-8)、伪影噪点(-5)、边缘锯齿(-3)
+- 风格：与提示词风格不符(-15)、风格不统一(-10)
+- 光影：光源矛盾(-8)、阴影错误(-5)
+
+请输出严格的 JSON（不要 Markdown、不要代码块），结构如下：
+{
+  "caption": string,
+  "overallScore": number,
+  "aestheticScore": number,
+  "promptAlignment": { "score": number, "notes": string },
+  "strengths": string[],
+  "issues": string[],
+  "suggestedPrompt": string,
+  "suggestedNegativePrompt": string,
+  "tags": string[]
+}
+
+要求：用中文；请严格按上述标准评分，不要轻易给高分；suggestedPrompt 要可直接用于文生图；若无 negativePrompt 建议则输出空字符串。`;
+  const userInstruction = getPreferences().aiImageAnalysisPrompt?.trim();
+  const instruction = userInstruction || defaultInstruction;
 
   const parts: any[] = [{ text: instruction }];
   if (prompt) parts.push({ text: `\n\n[USER_PROMPT]\n${prompt}` });
