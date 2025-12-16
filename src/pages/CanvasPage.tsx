@@ -590,25 +590,25 @@ function CanvasContent() {
           />
           
           {/* 左上角工具栏 - 返回按钮 + 状态显示 */}
-          <Panel position="top-left" className="!m-4 z-30">
+          <Panel position="top-left" className="!m-2 md:!m-4 !z-[100]">
             <div className="flex items-start gap-2">
               {/* 返回按钮 */}
               <Link
                 to={`/projects/${projectId}/canvases`}
-                className="bg-card/95 backdrop-blur-sm border border-border rounded-xl px-3 py-2 shadow-xl flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+                className="bg-card/95 backdrop-blur-sm border border-border rounded-xl px-2 py-1.5 md:px-3 md:py-2 shadow-xl flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" />
-                画布
+                <ArrowLeft className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span className="hidden sm:inline">画布</span>
               </Link>
               
-              {/* 状态面板 */}
+              {/* 状态面板 - 手机端简化 */}
               <div className="bg-card/95 backdrop-blur-sm border border-border rounded-xl shadow-xl overflow-hidden">
-                <div className="px-3 py-2 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
-                    <Files className="w-4 h-4 text-primary" />
+                <div className="px-2 py-1.5 md:px-3 md:py-2 flex items-center gap-2 md:gap-3">
+                  <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                    <Files className="w-3 h-3 md:w-4 md:h-4 text-primary" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold truncate max-w-[220px]">{canvasName}</div>
+                  <div className="min-w-0 hidden sm:block">
+                    <div className="text-xs font-semibold truncate max-w-[120px] md:max-w-[220px]">{canvasName}</div>
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
                       <span className="flex items-center gap-1">
                         <Layers className="w-3 h-3" />
@@ -628,13 +628,18 @@ function CanvasContent() {
                       )}
                     </div>
                   </div>
+                  {/* 手机端简化显示节点数量 */}
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground sm:hidden">
+                    <Layers className="w-3 h-3" />
+                    <span>{stats.total}</span>
+                  </div>
                   <Button
                     size="sm"
-                    className="h-7 px-2.5 text-xs bg-primary hover:bg-primary/90"
+                    className="h-6 px-2 md:h-7 md:px-2.5 text-[10px] md:text-xs bg-primary hover:bg-primary/90"
                     onClick={() => handleAddNode()}
                   >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    新建
+                    <Plus className="w-3 h-3 md:w-3.5 md:h-3.5 md:mr-1" />
+                    <span className="hidden md:inline">新建</span>
                   </Button>
                 </div>
               </div>
@@ -642,59 +647,60 @@ function CanvasContent() {
           </Panel>
 
           {/* 右上角控制栏 */}
-          <Panel position="top-right" className="!m-4 z-30">
-            <div className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-1.5 shadow-xl flex items-center gap-1">
+          <Panel position="top-right" className="!m-2 md:!m-4 !z-[100]">
+            <div className="bg-card/95 backdrop-blur-sm border border-border rounded-xl p-1 md:p-1.5 shadow-xl flex items-center gap-0.5 md:gap-1">
+              {/* 手机端隐藏选择/拖动模式切换 */}
               <Button
                 size="sm"
                 variant="ghost"
                 className={cn(
-                  "h-8 w-8 p-0",
+                  "h-7 w-7 md:h-8 md:w-8 p-0 hidden sm:flex",
                   !isPanMode && "bg-primary/20 text-primary"
                 )}
                 onClick={() => setIsPanMode(false)}
                 title="选择模式 (V)"
               >
-                <MousePointer2 className="w-4 h-4" />
+                <MousePointer2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 className={cn(
-                  "h-8 w-8 p-0",
+                  "h-7 w-7 md:h-8 md:w-8 p-0 hidden sm:flex",
                   isPanMode && "bg-primary/20 text-primary"
                 )}
                 onClick={() => setIsPanMode(true)}
                 title="拖动模式 (H)"
               >
-                <Hand className="w-4 h-4" />
+                <Hand className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </Button>
-              <div className="w-px h-5 bg-border mx-1" />
+              <div className="w-px h-4 md:h-5 bg-border mx-0.5 md:mx-1 hidden sm:block" />
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 md:h-8 md:w-8 p-0"
                 onClick={() => zoomIn()}
                 title="放大 (+)"
               >
-                <ZoomIn className="w-4 h-4" />
+                <ZoomIn className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 md:h-8 md:w-8 p-0"
                 onClick={() => zoomOut()}
                 title="缩小 (-)"
               >
-                <ZoomOut className="w-4 h-4" />
+                <ZoomOut className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 w-8 p-0"
+                className="h-7 w-7 md:h-8 md:w-8 p-0"
                 onClick={() => fitView({ padding: 0.2 })}
                 title="适应视图 (F)"
               >
-                <Maximize2 className="w-4 h-4" />
+                <Maximize2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </Button>
               <div className="w-px h-5 bg-border mx-1 hidden" />
               <Button

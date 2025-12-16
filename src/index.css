@@ -136,6 +136,19 @@
   stroke-width: 2;
 }
 
+/* 确保 ReactFlow Panel 在手机端缩放时不会消失 */
+.react-flow__panel {
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+/* 移动端触摸时保持面板可见 */
+@media (max-width: 640px) {
+  .react-flow__panel {
+    position: absolute !important;
+  }
+}
+
 .react-flow__handle {
   background-color: hsl(var(--primary)) !important;
   border: 2px solid hsl(var(--card)) !important;
