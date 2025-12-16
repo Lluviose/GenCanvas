@@ -9,12 +9,14 @@ import ReactFlow, {
   Panel,
   BackgroundVariant,
   ConnectionMode,
-  PanOnScrollMode
+  PanOnScrollMode,
+  MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useCanvasStore, AppNode } from '@/store/canvasStore';
 import { useCanvasesStore } from '@/store/canvasesStore';
 import CustomNode from '@/components/canvas/CustomNode';
+import CustomEdge from '@/components/canvas/CustomEdge';
 import Sidebar from '@/components/canvas/Sidebar';
 import type { NodeData } from '@/types';
 import { hasEffectivePromptContent } from '@/lib/promptParts';
@@ -48,11 +50,18 @@ const nodeTypes = {
   generationNode: CustomNode,
 };
 
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
 // 默认边样式
 const defaultEdgeOptions = {
-  style: { stroke: 'hsl(262 83% 58%)', strokeWidth: 2 },
-  type: 'smoothstep',
+  style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
+  type: 'custom',
   animated: true,
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+  },
 };
 
 function CanvasContent() {
@@ -546,6 +555,7 @@ function CanvasContent() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           connectionMode={ConnectionMode.Loose}
           onNodeClick={onNodeClick}
