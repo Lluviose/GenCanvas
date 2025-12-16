@@ -37,7 +37,7 @@ export default function Header() {
 
   return (
     <header className={cn(
-      "h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl backdrop-saturate-150 flex items-center justify-between px-4 sticky top-0 z-50 transition-all duration-500 ease-spring-smooth",
+      "h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl backdrop-saturate-150 flex items-center justify-between px-4 sticky top-0 z-50 transition-all duration-300",
       isCanvasPage && "border-b-0 bg-transparent backdrop-blur-none pointer-events-none absolute w-full p-4"
     )}>
       {/* Logo */}

@@ -208,56 +208,63 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
 
   return (
     <div className={cn(
-      "w-[320px] rounded-[24px] transition-all duration-300 group/node font-sans",
-      "bg-card/80 backdrop-blur-xl backdrop-saturate-150",
-      "border border-border/40 shadow-xl",
+      "w-[320px] rounded-2xl transition-all duration-300 group",
+      "bg-card/95 backdrop-blur-sm",
+      "border shadow-xl",
       selected 
-        ? "ring-2 ring-primary ring-offset-2 ring-offset-background/50 border-primary/50 shadow-primary/10" 
-        : "hover:border-primary/20 hover:shadow-2xl hover:-translate-y-0.5",
-      data.favorite && "ring-1 ring-yellow-400/50"
+        ? "border-primary/50 shadow-primary/10 scale-[1.02]" 
+        : "border-white/10 dark:border-white/5 hover:border-white/20 dark:hover:border-white/10 hover:shadow-2xl",
+      data.favorite && "ring-2 ring-yellow-400/20",
+      data.status === 'running' && "ring-2 ring-blue-400/30 animate-pulse"
     )}>
-      {/* 连接点 - 隐形交互优化 */}
+      {/* 连接点 - 默认小巧，hover 时放大 */}
       <Handle 
         type="target" 
         position={targetHandlePosition} 
         className={cn(
-          "!w-3.5 !h-3.5 !bg-primary !border-[3px] !border-background transition-all duration-300",
-          !selected && "opacity-0 scale-50 group-hover/node:opacity-100 group-hover/node:scale-100",
-          generateDirection === 'right' ? "!-left-1.5" : "!-top-1.5"
+          "!w-2.5 !h-2.5 !bg-muted-foreground/40 !border-2 !border-card transition-all duration-200",
+          "group-hover:!w-3.5 group-hover:!h-3.5 group-hover:!bg-primary group-hover:!shadow-lg group-hover:!shadow-primary/30",
+          generateDirection === 'right' ? "!-left-1" : "!-top-1",
+          generateDirection === 'right' ? "group-hover:!-left-1.5" : "group-hover:!-top-1.5"
         )}
       />
 
-      {/* 顶部状态栏 - iOS Widget Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/20 [.zoom-level-low_&]:hidden">
+      {/* 顶部状态栏 - iOS 风格精简 */}
+      <div className="flex items-center justify-between px-3 py-2.5 [.zoom-level-low_&]:hidden">
         <div className="flex items-center gap-2">
-          {/* Status Dot */}
           <div className={cn(
-            "w-2 h-2 rounded-full ring-2 ring-offset-1 ring-offset-card/50",
-            status.color.replace('text-', 'bg-').replace('/10', '') // Convert text color to bg color
-          )} />
-          <span className={cn("text-xs font-medium tracking-tight", status.color)}>
-            {status.label}
-          </span>
-          
+            "flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold tracking-wide uppercase transition-all",
+            status.color, status.bg
+          )}>
+            {status.icon}
+            <span className="[.zoom-level-low_&]:hidden">{status.label}</span>
+          </div>
           {data.favorite && (
-            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-sm" />
           )}
           {hasChangesFromParent && parentId && (
-            <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full" title="相对父节点有修改">
-              Modified
+            <span className="text-[9px] text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full font-medium [.zoom-level-low_&]:hidden" title="相对父节点有修改">
+              已修改
             </span>
           )}
         </div>
-        <span className="text-[10px] font-medium text-muted-foreground/60 tracking-tight font-mono">
-          {data.imageSize} · {data.count}
+        <span className="text-[10px] text-muted-foreground/70 font-medium [.zoom-level-low_&]:hidden">
+          {data.imageSize} · {data.aspectRatio} · ×{data.count}
         </span>
       </div>
 
-      {/* 节点关系导航 - Minimal Link */}
-      <div className="px-4 py-1.5 text-[10px] text-muted-foreground/50 flex items-center justify-between gap-2 border-b border-border/10 [.zoom-level-low_&]:hidden">
+      {/* 进度条 - 生成中状态 */}
+      {(data.status === 'running' || data.status === 'queued') && (
+        <div className="h-0.5 bg-secondary overflow-hidden [.zoom-level-low_&]:hidden">
+          <div className="h-full bg-gradient-to-r from-blue-500 via-primary to-blue-500 animate-[shimmer_1.5s_ease-in-out_infinite] bg-[length:200%_100%]" />
+        </div>
+      )}
+
+      {/* 节点关系导航 - 精简隐蔽 */}
+      <div className="px-3 py-1.5 text-[10px] text-muted-foreground/60 flex items-center justify-between gap-2 [.zoom-level-low_&]:hidden">
         {parentId ? (
           <button
-            className="min-w-0 inline-flex items-center gap-1.5 hover:text-primary transition-colors group/nav"
+            className="min-w-0 inline-flex items-center gap-1 hover:text-foreground transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setSelectedNodeId(parentId);
@@ -265,22 +272,22 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             }}
             title="查看父节点"
           >
-            <div className="w-1 h-3 rounded-full bg-border group-hover/nav:bg-primary/50 transition-colors" />
-            <span className="truncate max-w-[120px] font-medium">{parentLabel}</span>
+            <span className="opacity-60">↑</span>
+            <span className="truncate max-w-[120px]">{parentLabel}</span>
           </button>
         ) : (
-          <span className="opacity-60 flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-amber-500" />
-            <span className="font-medium">Root Node</span>
+          <span className="opacity-60 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
+            起点
           </span>
         )}
 
         <div className="flex items-center gap-2">
-          {durationLabel ? <span className="opacity-60 font-mono">{durationLabel}</span> : null}
+          {durationLabel ? <span className="opacity-60">{durationLabel}</span> : null}
           {childCount > 0 ? (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
-                className="inline-flex items-center hover:bg-secondary/80 transition-colors px-1 py-0.5 rounded-md"
+                className="inline-flex items-center hover:text-foreground transition-colors bg-secondary px-1 py-0.5 rounded"
                 onClick={(e) => {
                   e.stopPropagation();
                   updateNodeData(data.id, { collapsed: !data.collapsed });
@@ -290,7 +297,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                 {data.collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
               <button
-                className="inline-flex items-center gap-1 hover:bg-secondary/80 transition-colors px-1.5 py-0.5 rounded-md text-primary font-medium"
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors bg-secondary px-1.5 py-0.5 rounded"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!firstChildId) return;
@@ -308,26 +315,24 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         </div>
       </div>
 
-      {/* Prompt 区域 */}
-      <div className="px-4 py-3 [.zoom-level-low_&]:hidden">
+      {/* Prompt 区域 - 清爽排版 */}
+      <div className="px-3 py-3 [.zoom-level-low_&]:hidden">
         {isEditing ? (
-          <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-            <div className="rounded-xl border border-primary/20 shadow-sm overflow-hidden ring-4 ring-primary/5">
-                <PromptPartsEditor
-                  value={draftPrompt}
-                  promptParts={draftPromptParts}
-                  placeholder="输入提示词…"
-                  editorClassName="min-h-[84px] bg-background/50"
-                  onChange={({ prompt, promptParts }) => {
-                    setDraftPrompt(prompt);
-                    setDraftPromptParts(promptParts);
-                  }}
-                />
-            </div>
+          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+            <PromptPartsEditor
+              value={draftPrompt}
+              promptParts={draftPromptParts}
+              placeholder="输入提示词…（可用右侧 + 插入参考图）"
+              editorClassName="min-h-[84px]"
+              onChange={({ prompt, promptParts }) => {
+                setDraftPrompt(prompt);
+                setDraftPromptParts(promptParts);
+              }}
+            />
             <div className="flex gap-2">
               <Button
                 size="sm"
-                className="h-8 rounded-full text-xs font-medium px-4 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                className="h-7 text-xs"
                 onClick={async (e) => {
                   e.stopPropagation();
                   const nextPrompt = String(draftPrompt || '').trim();
@@ -343,12 +348,12 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   if (newIds?.[0]) focusNode(newIds[0]);
                 }}
               >
-                Save & Run
+                保存并生成
               </Button>
               <Button
                 size="sm"
-                variant="ghost"
-                className="h-8 rounded-full text-xs"
+                variant="outline"
+                className="h-7 text-xs"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsEditing(false);
@@ -356,7 +361,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   setDraftPromptParts(data.promptParts);
                 }}
               >
-                Cancel
+                取消
               </Button>
             </div>
           </div>
@@ -366,39 +371,38 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
               e.stopPropagation();
               setIsEditing(true);
             }}
-            className="cursor-text group/prompt"
+            className="cursor-text"
           >
             {/* 分支说明/备注优先显示 */}
             {data.notes && (
-              <div className="mb-2 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/10 w-fit">
-                <p className="text-xs text-primary font-semibold tracking-tight line-clamp-1">
+              <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                <p className="text-[11px] text-primary/90 font-medium line-clamp-1">
                   {data.notes}
                 </p>
               </div>
             )}
-            <p className="text-sm text-foreground/90 font-medium leading-relaxed tracking-tight line-clamp-2 [.zoom-level-medium_&]:line-clamp-1 group-hover/prompt:text-primary transition-colors">
+            <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed font-normal [.zoom-level-medium_&]:line-clamp-1">
               {data.prompt || (
-                <span className="text-muted-foreground/60 italic font-normal">Double click to edit prompt...</span>
+                <span className="text-muted-foreground/50 italic font-light">双击编辑提示词...</span>
               )}
             </p>
             {data.negativePrompt && (
-              <p className="text-[10px] text-muted-foreground/60 mt-1.5 line-clamp-1 [.zoom-level-medium_&]:hidden flex items-center gap-1">
-                <span className="w-1.5 h-0.5 rounded-full bg-red-400/50"></span>
-                {data.negativePrompt}
+              <p className="text-[10px] text-red-400/50 mt-1.5 line-clamp-1 [.zoom-level-medium_&]:hidden font-light">
+                <span className="opacity-60">排除:</span> {data.negativePrompt}
               </p>
             )}
             {tags.length ? (
-              <div className="flex flex-wrap gap-1.5 mt-2.5 [.zoom-level-medium_&]:hidden">
+              <div className="flex flex-wrap gap-1 mt-2 [.zoom-level-medium_&]:hidden">
                 {tags.slice(0, 4).map((t) => (
                   <span
                     key={t}
-                    className="px-2 py-0.5 rounded-md bg-secondary/50 border border-border/50 text-[10px] font-medium text-muted-foreground"
+                    className="px-2 py-0.5 rounded-full bg-secondary/80 text-[9px] text-muted-foreground font-medium"
                   >
-                    #{t}
+                    {t}
                   </span>
                 ))}
                 {tags.length > 4 ? (
-                  <span className="text-[10px] text-muted-foreground/40 font-medium">+{tags.length - 4}</span>
+                  <span className="text-[9px] text-muted-foreground/40">+{tags.length - 4}</span>
                 ) : null}
               </div>
             ) : null}
@@ -409,20 +413,20 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
       {data.errorMessage ? (
         <div
           className={cn(
-            "px-4 pb-3 text-xs font-medium [.zoom-level-low_&]:hidden",
-            data.status === 'failed' ? "text-red-400" : "text-amber-400"
+            "px-4 pb-3 text-xs [.zoom-level-low_&]:hidden",
+            data.status === 'failed' ? "text-red-300" : "text-amber-300"
           )}
         >
           {data.errorMessage}
         </div>
       ) : null}
 
-      {/* 图片预览区域 - Gallery Style */}
+      {/* 图片预览区域 - 大圆角精美展示 */}
       <div className={cn("px-3 pb-3", "transition-all duration-300", "[.zoom-level-low_&]:p-1.5 [.zoom-level-low_&]:h-full")}>
         {data.images && data.images.length > 0 ? (
           <div className={cn(
-            "rounded-2xl overflow-hidden relative shadow-inner bg-black/5 ring-1 ring-black/5 dark:ring-white/5",
-            data.images.length === 1 ? "" : "grid grid-cols-2 gap-0.5"
+            "rounded-xl overflow-hidden relative",
+            data.images.length === 1 ? "" : "grid grid-cols-2 gap-1.5"
           )}>
             {/* Status Overlay for Low Zoom */}
             <div className="hidden [.zoom-level-low_&]:flex absolute top-2 left-2 z-10 p-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white/90 shadow-sm border border-white/10">
@@ -433,27 +437,28 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
               <div 
                 key={img.id} 
                 className={cn(
-                  "relative overflow-hidden",
-                  "group/img cursor-pointer",
+                  "relative bg-secondary/50 overflow-hidden rounded-lg",
+                  "group/img cursor-pointer transition-transform duration-200 hover:scale-[1.02]",
                   data.images.length === 1 ? "aspect-[4/3]" : "aspect-square"
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedNodeId(data.id);
+                  // 可以添加预览大图逻辑，目前先仅选中
                 }}
               >
                 <ResolvedImage 
                   src={img.url} 
                   alt={`生成图片 ${idx + 1}`} 
-                  className="object-cover w-full h-full transition-transform duration-500 group-hover/img:scale-110" 
+                  className="object-cover w-full h-full transition-transform group-hover/img:scale-105" 
                 />
                 
                 {/* 悬浮操作层 - 核心交互优化 */}
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px] [.zoom-level-low_&]:hidden">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 backdrop-blur-[1px] [.zoom-level-low_&]:hidden">
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-8 w-8 p-0 rounded-full bg-white/10 hover:bg-white text-white hover:text-black border border-white/20 backdrop-blur-md transition-all scale-90 hover:scale-100"
+                    className="h-7 w-7 p-0 rounded-full bg-black/40 hover:bg-primary text-white border border-white/20"
                     title="以此图为垫图继续生成"
                     onClick={async (e) => {
                       e.stopPropagation();
@@ -468,28 +473,28 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                       }
                     }}
                   >
-                    <GitBranch className="h-4 w-4" />
+                    <GitBranch className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-8 w-8 p-0 rounded-full bg-white/10 hover:bg-white text-white hover:text-black border border-white/20 backdrop-blur-md transition-all scale-90 hover:scale-100"
+                    className="h-7 w-7 p-0 rounded-full bg-black/40 hover:bg-white/20 text-white border border-white/20"
                     title="下载原图"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDownloadImage(img.url, img.id);
                     }}
                   >
-                    <Download className="h-4 w-4" />
+                    <Download className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     className={cn(
-                      "h-8 w-8 p-0 rounded-full border border-white/20 backdrop-blur-md transition-all scale-90 hover:scale-100",
+                      "h-7 w-7 p-0 rounded-full border border-white/20",
                       img.isFavorite 
-                        ? "bg-yellow-400 text-black hover:bg-yellow-500 border-transparent shadow-[0_0_10px_rgba(250,204,21,0.5)]" 
-                        : "bg-white/10 hover:bg-white text-white hover:text-black"
+                        ? "bg-yellow-400/90 text-black hover:bg-yellow-400" 
+                        : "bg-black/40 hover:bg-white/20 text-white"
                     )}
                     title={img.isFavorite ? '取消收藏' : '收藏图片'}
                     onClick={(e) => {
@@ -497,22 +502,22 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                       toggleFavoriteImage(img.id);
                     }}
                   >
-                    <Star className={cn("h-4 w-4", img.isFavorite && "fill-current")} />
+                    <Star className={cn("h-3.5 w-3.5", img.isFavorite && "fill-current")} />
                   </Button>
                 </div>
 
-                {/* 常驻收藏标记 */}
+                {/* 常驻收藏标记 (未悬浮时显示) */}
                 {img.isFavorite && (
-                  <div className="absolute top-2 right-2 pointer-events-none group-hover/img:opacity-0 transition-opacity [.zoom-level-low_&]:opacity-100">
-                    <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-md" />
+                  <div className="absolute top-1 right-1 pointer-events-none group-hover/img:opacity-0 transition-opacity [.zoom-level-low_&]:opacity-100">
+                    <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 drop-shadow" />
                   </div>
                 )}
                 
                 {/* AI评分显示 */}
                 {typeof img.aiOverallScore === 'number' && (
                   <span className={cn(
-                    "absolute bottom-1.5 left-1.5 text-[10px] px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md font-semibold group-hover/img:opacity-0 transition-opacity [.zoom-level-low_&]:opacity-100",
-                    img.aiOverallScore >= 80 ? "text-emerald-300 ring-1 ring-emerald-500/30" : "text-white/90"
+                    "absolute bottom-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/50 font-medium group-hover/img:opacity-0 transition-opacity [.zoom-level-low_&]:opacity-100",
+                    img.aiOverallScore >= 80 ? "text-emerald-300" : "text-white/80"
                   )}>
                     {Math.round(img.aiOverallScore)}
                   </span>
@@ -520,26 +525,23 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
               </div>
             ))}
             {data.images.length > 4 && (
-              <div className="absolute bottom-1.5 right-1.5 text-[10px] font-bold bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-full border border-white/10">
+              <div className="absolute bottom-1 right-1 text-[10px] bg-black/60 text-white/80 px-1.5 py-0.5 rounded">
                 +{data.images.length - 4}
               </div>
             )}
           </div>
         ) : (
-          <div className="w-full aspect-[2/1] rounded-2xl border-2 border-dashed border-border/50 bg-secondary/20 flex flex-col items-center justify-center text-muted-foreground gap-2 transition-colors hover:border-primary/30 hover:bg-primary/5">
-            <ImageIcon className="h-6 w-6 opacity-20" />
-            <span className="text-xs font-medium opacity-40 [.zoom-level-low_&]:hidden">No Images Generated</span>
+          <div className="w-full aspect-[2.5/1] rounded-xl border border-dashed border-border/30 bg-secondary/30 flex items-center justify-center text-muted-foreground/40 gap-2 transition-colors hover:bg-secondary/50 hover:border-border/50">
+            <ImageIcon className="h-5 w-5" />
+            <span className="text-xs font-light [.zoom-level-low_&]:hidden">点击下方生成按钮</span>
           </div>
         )}
 
         {data.collapsed && childCount > 0 ? (
-          <div className="mt-3 rounded-2xl border border-border/40 bg-secondary/30 p-2 [.zoom-level-low_&]:hidden">
-            <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground font-medium mb-2 px-1">
-              <span className="truncate flex items-center gap-1.5">
-                <ChevronDown className="w-3 h-3" />
-                Collapsed Branch
-              </span>
-              {collapsedHiddenCount > 0 ? <span className="shrink-0 bg-background/50 px-1.5 rounded-md">+{collapsedHiddenCount}</span> : null}
+          <div className="mt-2 rounded-lg border border-border/60 bg-background/70 p-2 [.zoom-level-low_&]:hidden">
+            <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground mb-1">
+              <span className="truncate">已收起子树</span>
+              {collapsedHiddenCount > 0 ? <span className="shrink-0">隐藏 {collapsedHiddenCount}</span> : null}
             </div>
 
             {prefs.canvasCollapsedPreviewImages !== false ? (
@@ -551,7 +553,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                     return (
                       <button
                         key={`${p.imageId}_${p.nodeId}`}
-                        className="relative w-full aspect-square overflow-hidden rounded-lg border border-border/20 bg-muted hover:ring-2 hover:ring-primary/50 transition-all"
+                        className="relative w-full aspect-square overflow-hidden rounded border border-border/40 bg-muted"
                         title="展开并定位到该节点"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -562,7 +564,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                       >
                         <img src={p.url} alt="" className="w-full h-full object-cover" />
                         {isLast && more > 0 ? (
-                          <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] text-white text-xs font-bold flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black/55 text-white text-xs font-semibold flex items-center justify-center">
                             +{more}
                           </div>
                         ) : null}
@@ -571,23 +573,25 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
                   })}
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/50 px-1 italic">No preview images</div>
+                <div className="text-[11px] text-muted-foreground/80">暂无可预览图片</div>
               )
-            ) : null}
+            ) : (
+              <div className="text-[11px] text-muted-foreground/80">子树图片预览已关闭（可在设置中开启）</div>
+            )}
           </div>
         ) : null}
       </div>
 
-      {/* 快速微调：从这里继续生成 - Always Visible but Cleaner */}
+      {/* 快速微调：从这里继续生成 */}
       <div
-        className="px-4 pb-3 [.zoom-level-low_&]:hidden [.zoom-level-medium_&]:hidden"
+        className="px-3 pb-3 [.zoom-level-low_&]:hidden [.zoom-level-medium_&]:hidden"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative group/input">
+        <div className="flex items-center gap-1.5">
           <Input
-            className="h-9 pl-3 pr-9 text-xs border-border/50 bg-secondary/30 focus-visible:ring-primary/30 focus-visible:bg-background transition-all rounded-xl placeholder:text-muted-foreground/40"
-            placeholder="Type tweak & enter to branch..."
+            className="h-8 text-xs border-0 bg-secondary/50 rounded-lg focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/40 font-light"
+            placeholder="输入变化后回车继续… 如：插画风/特写/雨夜"
             value={quickTweak}
             onChange={(e) => setQuickTweak(e.target.value)}
             onKeyDown={(e) => {
@@ -617,7 +621,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
           <Button
             size="sm"
             variant="ghost"
-            className="absolute right-1 top-1 h-7 w-7 p-0 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            className="h-7 px-2 text-xs hover:bg-primary/10 hover:text-primary"
             onClick={() => {
               const tweak = String(quickTweak || '').trim();
               const basePrompt = String(data.prompt || '').trim();
@@ -644,13 +648,13 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
         </div>
       </div>
 
-      {/* 底部操作栏 - iOS Toolbar Style */}
-      <div className="px-4 py-3 border-t border-border/30 flex items-center justify-between [.zoom-level-low_&]:hidden bg-secondary/5 rounded-b-[24px]">
-        <div className="flex items-center gap-1">
+      {/* 底部操作栏 - 精简洁净 */}
+      <div className="px-3 py-2.5 border-t border-border/30 flex items-center justify-between [.zoom-level-low_&]:hidden">
+        <div className="flex items-center gap-0.5">
           <Button 
             size="sm" 
             variant="ghost" 
-            className="h-8 w-8 p-0 rounded-full hover:bg-yellow-400/10 hover:text-yellow-400 transition-colors"
+            className="h-7 w-7 p-0 hover:bg-yellow-500/10"
             title={data.favorite ? '取消收藏' : '收藏节点'}
             onClick={(e) => {
               e.stopPropagation();
@@ -658,49 +662,48 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             }}
           >
             <Star className={cn(
-              "h-4 w-4 transition-colors",
+              "h-3.5 w-3.5 transition-colors",
               data.favorite 
                 ? "fill-yellow-400 text-yellow-400" 
-                : "text-muted-foreground/60"
+                : "text-muted-foreground hover:text-yellow-400"
             )} />
           </Button>
           <div className="relative">
             <Button 
               size="sm" 
               variant="ghost" 
-              className="h-8 w-8 p-0 rounded-full hover:bg-secondary text-muted-foreground/60 hover:text-foreground"
+              className="h-7 w-7 p-0"
               title="更多操作"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowMoreActions(!showMoreActions);
               }}
             >
-              <MoreHorizontal className="h-4 w-4" />
+              <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
             {showMoreActions && (
               <div 
-                className="absolute bottom-full left-0 mb-2 bg-popover/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl py-1.5 min-w-[140px] z-50 overflow-hidden ring-1 ring-black/5"
+                className="absolute bottom-full left-0 mb-1 bg-popover border border-border rounded-lg shadow-xl py-1 min-w-[120px] z-50"
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
-                  className="w-full px-3 py-2 text-xs font-medium text-left hover:bg-primary/10 hover:text-primary flex items-center gap-2 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-left hover:bg-secondary flex items-center gap-2"
                   onClick={() => {
                     duplicateNode(data.id);
                     setShowMoreActions(false);
                   }}
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  <Copy className="h-3 w-3" />
                   复制节点
                 </button>
-                <div className="h-px bg-border/50 my-1 mx-2" />
                 <button
-                  className="w-full px-3 py-2 text-xs font-medium text-left hover:bg-red-500/10 hover:text-red-500 flex items-center gap-2 text-red-400/80 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-left hover:bg-secondary flex items-center gap-2 text-red-400"
                   onClick={() => {
                     removeNode(data.id);
                     setShowMoreActions(false);
                   }}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3 w-3" />
                   删除节点
                 </button>
               </div>
@@ -708,15 +711,16 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Button
             size="sm"
             variant="ghost"
             className={cn(
-              "h-8 px-3 text-xs font-medium rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary",
+              "h-8 px-3 text-xs rounded-full bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground",
               "[.zoom-level-medium_&]:px-2"
             )}
             disabled={isGeneratingNext || isRegeneratingNext || data.status === 'running' || data.status === 'queued'}
+            title="重新生成（只保留最新一批）"
             onClick={async (e) => {
               e.stopPropagation();
               if (!hasEffectivePromptContent(String(data.prompt || ''), data.promptParts)) {
@@ -733,14 +737,16 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             }}
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-            重试
+            重新生成
           </Button>
 
           <Button
             size="sm"
             className={cn(
-              "h-8 px-4 text-xs font-semibold rounded-full shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95",
-              isGeneratingNext ? "bg-blue-600 hover:bg-blue-700" : "bg-primary hover:bg-primary/90"
+              "h-8 px-4 text-xs font-medium rounded-full shadow-sm transition-all [.zoom-level-medium_&]:px-3",
+              isGeneratingNext 
+                ? "bg-blue-500 hover:bg-blue-600 shadow-blue-500/20" 
+                : "bg-primary hover:bg-primary/90 shadow-primary/20 hover:shadow-md hover:shadow-primary/30"
             )}
             disabled={isGeneratingNext || isRegeneratingNext || data.status === 'running' || data.status === 'queued'}
             onClick={async (e) => {
@@ -761,26 +767,27 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
             {isGeneratingNext ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                <span className="[.zoom-level-medium_&]:hidden">Generating</span>
+                <span className="[.zoom-level-medium_&]:hidden">生成中</span>
               </>
             ) : (
               <>
                 <Play className="h-3.5 w-3.5 mr-1.5 fill-current" />
-                <span className="[.zoom-level-medium_&]:hidden">Generate</span>
+                <span className="[.zoom-level-medium_&]:hidden">生成</span>
               </>
             )}
           </Button>
         </div>
       </div>
 
-      {/* 连接点 - 输出 */}
+      {/* 连接点 - 默认小巧，hover 时放大 */}
       <Handle 
         type="source" 
         position={sourceHandlePosition} 
         className={cn(
-          "!w-3.5 !h-3.5 !bg-primary !border-[3px] !border-background transition-all duration-300",
-          !selected && "opacity-0 scale-50 group-hover/node:opacity-100 group-hover/node:scale-100",
-          generateDirection === 'right' ? "!-right-1.5" : "!-bottom-1.5"
+          "!w-2.5 !h-2.5 !bg-muted-foreground/40 !border-2 !border-card transition-all duration-200",
+          "group-hover:!w-3.5 group-hover:!h-3.5 group-hover:!bg-primary group-hover:!shadow-lg group-hover:!shadow-primary/30",
+          generateDirection === 'right' ? "!-right-1" : "!-bottom-1",
+          generateDirection === 'right' ? "group-hover:!-right-1.5" : "group-hover:!-bottom-1.5"
         )}
       />
     </div>

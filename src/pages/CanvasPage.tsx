@@ -32,7 +32,12 @@ import {
   Files,
   Star,
   Layers,
+  ArrowLeft,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useThemeStore } from '@/store/themeStore';
 import { cn } from '@/lib/utils';
 import { useParams } from 'react-router-dom';
 import { usePreferencesStore } from '@/store/preferencesStore';
@@ -107,7 +112,12 @@ function CanvasContent() {
     setZoomTier((prev) => (prev === tier ? prev : tier));
   }, []);
   
-  // Theme handled by Header component
+  // 主题切换
+  const { theme, setTheme } = useThemeStore();
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+  const ThemeIcon = theme === 'light' ? Sun : Moon;
 
   type CollapsedPreviewItem = { nodeId: string; imageId: string; url: string };
 

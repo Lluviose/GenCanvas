@@ -33,11 +33,11 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-md transition-all duration-500 ease-spring-smooth animate-in fade-in-0"
+        className="fixed inset-0 bg-black/50 backdrop-blur-md animate-in fade-in-0 duration-200"
         onClick={() => onOpenChange(false)}
       />
       {/* Content */}
-      <div className="relative z-50 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300 ease-spring-smooth">
+      <div className="relative z-50 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300">
         {children}
       </div>
     </div>
@@ -53,14 +53,14 @@ interface DialogContentProps {
 export function DialogContent({ children, className, onClose }: DialogContentProps) {
   return (
     <div className={cn(
-      "bg-card/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/10 shadow-2xl w-full max-w-md p-6 rounded-[24px] ring-1 ring-black/5",
+      "bg-card/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6",
       className
     )}>
       {onClose && (
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-4 right-4 h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+          className="absolute top-4 right-4 h-8 w-8 rounded-full hover:bg-foreground/10"
           onClick={onClose}
         >
           <X className="h-4 w-4" />

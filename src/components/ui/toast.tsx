@@ -57,36 +57,43 @@ const iconMap = {
 };
 
 const colorMap = {
-  success: 'text-emerald-400',
-  error: 'text-red-400',
-  info: 'text-blue-400',
-  warning: 'text-amber-400',
+  success: 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400',
+  error: 'bg-red-500/15 border-red-500/25 text-red-400',
+  info: 'bg-blue-500/15 border-blue-500/25 text-blue-400',
+  warning: 'bg-amber-500/15 border-amber-500/25 text-amber-400',
+};
+
+const iconBgMap = {
+  success: 'bg-emerald-500/20',
+  error: 'bg-red-500/20',
+  info: 'bg-blue-500/20',
+  warning: 'bg-amber-500/20',
 };
 
 export function ToastContainer() {
   const { toasts, removeToast } = useToastStore();
 
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 w-full max-w-[420px] pointer-events-none px-4">
-      {toasts.map((toast) => {
-        const Icon = iconMap[toast.type];
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3">
+      {toasts.map((t) => {
+        const Icon = iconMap[t.type];
         
         return (
           <div
-            key={toast.id}
+            key={t.id}
             className={cn(
-              "pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-xl border border-white/10 transition-all duration-500 ease-spring-smooth",
-              "bg-black/85 text-white ring-1 ring-white/5", // Dynamic Island aesthetic
-              "animate-in slide-in-from-top-4 fade-in zoom-in-95"
+              "flex items-center gap-3 pl-3 pr-4 py-3 rounded-2xl border backdrop-blur-xl shadow-2xl",
+              "animate-in slide-in-from-right-5 fade-in-0 duration-300",
+              colorMap[t.type]
             )}
           >
-            <div className={cn("shrink-0 p-0.5 rounded-full bg-white/10", colorMap[toast.type])}>
-              <Icon className="w-4 h-4" />
+            <div className={cn("p-1.5 rounded-xl", iconBgMap[t.type])}>
+              <Icon className="w-4 h-4 shrink-0" />
             </div>
-            <span className="text-xs font-medium tracking-tight">{toast.message}</span>
+            <span className="text-sm font-medium text-foreground/90">{t.message}</span>
             <button
-              onClick={() => removeToast(toast.id)}
-              className="ml-2 p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              onClick={() => removeToast(t.id)}
+              className="ml-1 p-1 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-all"
             >
               <X className="w-3.5 h-3.5" />
             </button>
