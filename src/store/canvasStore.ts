@@ -35,6 +35,7 @@ import {
 } from '@/services/workbenchApi';
 import { toast } from '@/components/ui/toast';
 import { getPreferences } from './preferencesStore';
+import { bgTaskManager } from '@/services/backgroundTaskManager';
 
 // Extend Node with our NodeData
 export type AppNode = Node<NodeData>;
@@ -1030,6 +1031,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     const startAt = performance.now();
 
+    // 启动后台任务追踪
+    const taskId = await bgTaskManager.startTask(nodeId);
+
     try {
       const resp = await generateWorkbench({
         prompt: mergedData.prompt,
@@ -1140,6 +1144,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         galleryImages: normalized.length > 0 ? [...normalized, ...prev.galleryImages] : prev.galleryImages,
       }));
 
+      // 标记任务完成
+      bgTaskManager.completeTask(taskId);
+
       if (!options?.silent) {
         const failed = Array.from(nodePatches.values()).filter((p) => p.status === 'failed').length;
         if (failed > 0) {
@@ -1172,6 +1179,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       const duration = performance.now() - startAt;
       const message = error?.message || '生成失败';
       const finishedAt = new Date().toISOString();
+
+      // 标记任务失败
+      bgTaskManager.failTask(taskId, message);
 
       set((prev) => ({
         nodes: prev.nodes.map((n) =>
@@ -1711,6 +1721,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const startAt = performance.now();
     const startedAt = new Date().toISOString();
 
+    // 启动后台任务追踪
+    const taskId = await bgTaskManager.startTask(id);
+
     set((prev) => ({
       nodes: prev.nodes.map((n) =>
         n.id === id
@@ -1882,6 +1895,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         galleryImages: [...normalized, ...prev.galleryImages],
       }));
 
+      // 标记任务完成
+      bgTaskManager.completeTask(taskId);
+
       if (!options?.silent) {
         if (runErrorMessage) {
           toast.success(`图片生成完成（部分失败 ${failedCount}/${requestedCount}），耗时 ${(duration / 1000).toFixed(1)} s`);
@@ -1915,6 +1931,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       console.error(error);
       const duration = performance.now() - startAt;
       const message = error?.message || '生成失败';
+
+      // 标记任务失败
+      bgTaskManager.failTask(taskId, message);
 
       set((prev) => ({
         nodes: prev.nodes.map((n) =>

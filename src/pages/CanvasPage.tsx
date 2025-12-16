@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { useParams } from 'react-router-dom';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { toast } from '@/components/ui/toast';
+import { bgTaskManager } from '@/services/backgroundTaskManager';
 
 // Simple ID gen for MVP
 const generateId = () => `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -735,11 +736,20 @@ export default function CanvasPage() {
     hydrate(projectId, canvasId);
     hydrateCanvases(projectId);
     refreshWorkbenchHealth();
+    
+    // 初始化后台任务管理器（防止手机端退出后台时任务中断）
+    bgTaskManager.init();
+    
     try {
       localStorage.setItem('photopro:last-canvas', JSON.stringify({ projectId, canvasId }));
     } catch {
       // ignore
     }
+
+    return () => {
+      // 清理后台任务管理器
+      bgTaskManager.destroy();
+    };
   }, [hydrate, hydrateCanvases, refreshWorkbenchHealth, projectId, canvasId]);
 
   return (

@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Toast {
   id: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
   message: string;
   duration?: number;
 }
@@ -39,21 +39,28 @@ export const useToastStore = create<ToastStore>((set) => ({
 
 // 快捷方法
 export const toast = {
-  success: (message: string) => useToastStore.getState().addToast({ type: 'success', message }),
-  error: (message: string) => useToastStore.getState().addToast({ type: 'error', message }),
-  info: (message: string) => useToastStore.getState().addToast({ type: 'info', message }),
+  success: (message: string, options?: { duration?: number }) =>
+    useToastStore.getState().addToast({ type: 'success', message, ...options }),
+  error: (message: string, options?: { duration?: number }) =>
+    useToastStore.getState().addToast({ type: 'error', message, ...options }),
+  info: (message: string, options?: { duration?: number }) =>
+    useToastStore.getState().addToast({ type: 'info', message, ...options }),
+  warning: (message: string, options?: { duration?: number }) =>
+    useToastStore.getState().addToast({ type: 'warning', message, ...options }),
 };
 
 const iconMap = {
   success: CheckCircle2,
   error: AlertCircle,
   info: Info,
+  warning: AlertTriangle,
 };
 
 const colorMap = {
   success: 'bg-green-500/10 border-green-500/20 text-green-400',
   error: 'bg-red-500/10 border-red-500/20 text-red-400',
   info: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
+  warning: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
 };
 
 export function ToastContainer() {
