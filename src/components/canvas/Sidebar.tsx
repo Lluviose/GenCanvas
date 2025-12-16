@@ -1088,13 +1088,15 @@ export default function Sidebar(props: SidebarProps) {
 
   return (
     <>
-      {/* 折叠/展开按钮 - 独立悬浮 */}
+      {/* 折叠/展开按钮 - 移动端始终可见 */}
       <div
         className={cn(
           "absolute z-50 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
           isCollapsed 
             ? "right-4 top-4" 
-            : "right-[400px] top-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 pointer-events-none hover:pointer-events-auto"
+            : "md:right-[400px] right-[calc(100%-16px)] top-4 md:top-1/2 md:-translate-y-1/2",
+          // 桌面端未收起时半隐藏，移动端始终可见
+          !isCollapsed && "md:opacity-0 md:hover:opacity-100 md:pointer-events-none md:hover:pointer-events-auto"
         )}
       >
         <Button
@@ -1102,7 +1104,7 @@ export default function Sidebar(props: SidebarProps) {
           size="icon"
           className={cn(
             "h-10 w-10 rounded-full shadow-lg border border-white/10 bg-card/80 backdrop-blur-md hover:bg-card hover:scale-105 transition-all",
-            !isCollapsed && "translate-x-1/2"
+            !isCollapsed && "md:translate-x-1/2"
           )}
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? "展开侧边栏" : "收起侧边栏"}
@@ -1114,17 +1116,19 @@ export default function Sidebar(props: SidebarProps) {
       {/* 侧边栏主体 - Floating Panel */}
       <div 
         className={cn(
-          "absolute top-4 bottom-4 right-4 z-40 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col",
-          "pointer-events-none", // Wrapper allows clicks to pass through outside
-          isCollapsed ? "translate-x-[calc(100%+24px)] opacity-0" : "translate-x-0 opacity-100"
+          "absolute z-40 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col",
+          "pointer-events-none",
+          // 移动端全屏，桌面端悬浮
+          "top-0 bottom-0 right-0 md:top-4 md:bottom-4 md:right-4",
+          isCollapsed ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
         )}
       >
         <div 
           className={cn(
-            "w-[380px] h-full flex flex-col",
-            "bg-card/85 backdrop-blur-2xl backdrop-saturate-150",
-            "border border-white/10 dark:border-white/5 shadow-2xl shadow-black/10",
-            "rounded-[28px] overflow-hidden pointer-events-auto ring-1 ring-black/5"
+            "w-full md:w-[380px] h-full flex flex-col",
+            "bg-card/95 md:bg-card/85 backdrop-blur-2xl backdrop-saturate-150",
+            "border-l md:border border-white/10 dark:border-white/5 shadow-2xl shadow-black/10",
+            "md:rounded-[28px] overflow-hidden pointer-events-auto md:ring-1 ring-black/5"
           )}
         >
            <SidebarContent {...props} />
