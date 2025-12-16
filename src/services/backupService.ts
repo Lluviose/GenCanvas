@@ -497,7 +497,7 @@ export const backupToWebDAV = async (
   config: WebDAVConfig,
   options?: { includeCanvases?: boolean }
 ): Promise<{ success: boolean; message: string; filename?: string }> => {
-  const data = exportBackupData(options);
+  const data = await exportBackupData(options);
   const json = JSON.stringify(data, null, 2);
   const filename = `gencanvas-backup-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
 

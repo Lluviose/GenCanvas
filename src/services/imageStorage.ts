@@ -83,23 +83,31 @@ export const saveImages = async (images: StoredImage[]): Promise<void> => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
 
-      let completed = 0;
       let hasError = false;
+
+      tx.oncomplete = () => {
+        if (!hasError) resolve();
+      };
+
+      tx.onabort = () => {
+        if (hasError) return;
+        hasError = true;
+        console.warn('IndexedDB saveImages failed', tx.error);
+        reject(tx.error);
+      };
+
+      tx.onerror = () => {};
 
       for (const img of images) {
         const request = store.put(img);
         request.onerror = () => {
-          if (!hasError) {
-            hasError = true;
-            console.warn('IndexedDB saveImages failed', request.error);
-            reject(request.error);
-          }
-        };
-        request.onsuccess = () => {
-          completed++;
-          if (completed === images.length && !hasError) {
-            resolve();
-          }
+          if (hasError) return;
+          hasError = true;
+          console.warn('IndexedDB saveImages failed', request.error);
+          try {
+            tx.abort();
+          } catch {}
+          reject(request.error);
         };
       }
     });
@@ -147,25 +155,35 @@ export const getImages = async (ids: string[]): Promise<Map<string, StoredImage>
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
 
-      let completed = 0;
       let hasError = false;
+
+      tx.oncomplete = () => {
+        if (!hasError) resolve(result);
+      };
+
+      tx.onabort = () => {
+        if (hasError) return;
+        hasError = true;
+        console.warn('IndexedDB getImages failed', tx.error);
+        reject(tx.error);
+      };
+
+      tx.onerror = () => {};
 
       for (const id of ids) {
         const request = store.get(id);
         request.onerror = () => {
-          if (!hasError) {
-            hasError = true;
-            console.warn('IndexedDB getImages failed', request.error);
-            reject(request.error);
-          }
+          if (hasError) return;
+          hasError = true;
+          console.warn('IndexedDB getImages failed', request.error);
+          try {
+            tx.abort();
+          } catch {}
+          reject(request.error);
         };
         request.onsuccess = () => {
           if (request.result) {
             result.set(id, request.result);
-          }
-          completed++;
-          if (completed === ids.length && !hasError) {
-            resolve(result);
           }
         };
       }
@@ -238,23 +256,31 @@ export const deleteImages = async (ids: string[]): Promise<void> => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
 
-      let completed = 0;
       let hasError = false;
+
+      tx.oncomplete = () => {
+        if (!hasError) resolve();
+      };
+
+      tx.onabort = () => {
+        if (hasError) return;
+        hasError = true;
+        console.warn('IndexedDB deleteImages failed', tx.error);
+        reject(tx.error);
+      };
+
+      tx.onerror = () => {};
 
       for (const id of ids) {
         const request = store.delete(id);
         request.onerror = () => {
-          if (!hasError) {
-            hasError = true;
-            console.warn('IndexedDB deleteImages failed', request.error);
-            reject(request.error);
-          }
-        };
-        request.onsuccess = () => {
-          completed++;
-          if (completed === ids.length && !hasError) {
-            resolve();
-          }
+          if (hasError) return;
+          hasError = true;
+          console.warn('IndexedDB deleteImages failed', request.error);
+          try {
+            tx.abort();
+          } catch {}
+          reject(request.error);
         };
       }
     });

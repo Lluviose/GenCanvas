@@ -73,9 +73,9 @@ export default function BackupPage() {
 
   // ============ Local Backup ============
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      downloadBackupAsJSON({ includeCanvases });
+      await downloadBackupAsJSON({ includeCanvases });
       toast.success('备份文件已下载');
     } catch (e: any) {
       toast.error(e?.message || '导出失败');
@@ -118,16 +118,20 @@ export default function BackupPage() {
 
   useEffect(() => {
     let cancelled = false;
-    exportBackupData({ includeCanvases }).then((data) => {
-      if (cancelled) return;
-      setPreviewStats({
-        galleryImages: data.galleryImages.length,
-        promptLibrary: data.promptLibrary.length,
-        projects: data.projects?.length || 0,
-        canvases: Object.values(data.canvases || {}).flat().length,
-        canvasSnapshots: Object.keys(data.canvasSnapshots || {}).length,
+    exportBackupData({ includeCanvases })
+      .then((data) => {
+        if (cancelled) return;
+        setPreviewStats({
+          galleryImages: data.galleryImages.length,
+          promptLibrary: data.promptLibrary.length,
+          projects: data.projects?.length || 0,
+          canvases: Object.values(data.canvases || {}).flat().length,
+          canvasSnapshots: Object.keys(data.canvasSnapshots || {}).length,
+        });
+      })
+      .catch((error) => {
+        console.warn('exportBackupData failed', error);
       });
-    });
     return () => { cancelled = true; };
   }, [includeCanvases]);
 
