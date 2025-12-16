@@ -1,12 +1,12 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
-  Layers, 
   FolderKanban, 
   Image,
   SlidersHorizontal,
   Settings,
   Sparkles,
+  ChevronLeft,
   Sun,
   Moon,
   Aperture
@@ -35,30 +35,46 @@ export default function Header() {
   };
 
   const ThemeIcon = theme === 'light' ? Sun : Moon;
+  const backTo = projectId ? `/projects/${projectId}/canvases` : '/projects';
 
   return (
     <header className={cn(
-      "h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl backdrop-saturate-150 flex items-center justify-between px-4 sticky top-0 z-50 transition-all duration-300",
-      isCanvasPage && "border-b-0 bg-transparent backdrop-blur-none pointer-events-none absolute w-full p-4"
+      isCanvasPage
+        ? "fixed top-0 left-0 right-0 z-[200] pointer-events-none p-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-start justify-between"
+        : "h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl backdrop-saturate-150 flex items-center justify-between px-4 sticky top-0 z-50 transition-all duration-300"
     )}>
-      {/* Logo */}
-      <div className={cn("flex items-center gap-4 pointer-events-auto", isCanvasPage && "bg-background/60 backdrop-blur-xl backdrop-saturate-150 rounded-full pl-1.5 pr-4 py-1.5 border border-border/40 shadow-sm")}>
-        <Link to="/workbench" className="flex items-center gap-2 hover:opacity-80 transition-opacity group">
-          <div className="relative w-8 h-8 rounded-lg overflow-hidden shadow-sm">
-            {/* 流动彩虹背景 */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-rose-500 via-amber-500 via-emerald-500 via-cyan-500 via-blue-500 to-violet-500 animate-gradient-xy opacity-90"></div>
-            {/* 玻璃光泽 */}
-            <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent"></div>
-            {/* 图标 */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Aperture className="w-4.5 h-4.5 text-white drop-shadow-md" />
+      {/* Left */}
+      {isCanvasPage ? (
+        <div className="pointer-events-auto bg-background/70 backdrop-blur-xl backdrop-saturate-150 rounded-full p-1.5 border border-border/40 shadow-sm">
+          <Link
+            to={backTo}
+            className="flex items-center gap-2 h-10 pl-2.5 pr-3 rounded-full text-sm font-medium text-foreground/85 hover:text-foreground hover:bg-secondary/80 transition-all"
+            title="返回"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="sm:hidden">返回</span>
+            <span className="hidden sm:inline">返回项目</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4 pointer-events-auto">
+          <Link to="/workbench" className="flex items-center gap-2 hover:opacity-80 transition-opacity group">
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden shadow-sm">
+              {/* 流动彩虹背景 */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-rose-500 via-amber-500 via-emerald-500 via-cyan-500 via-blue-500 to-violet-500 animate-gradient-xy opacity-90"></div>
+              {/* 玻璃光泽 */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent"></div>
+              {/* 图标 */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Aperture className="w-4.5 h-4.5 text-white drop-shadow-md" />
+              </div>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-semibold text-base tracking-tight text-foreground/90">GenCanvas</span>
-          </div>
-        </Link>
-      </div>
+            <div className="flex items-baseline gap-2">
+              <span className="font-semibold text-base tracking-tight text-foreground/90">GenCanvas</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Navigation */}
       {!isCanvasPage && (
@@ -88,18 +104,8 @@ export default function Header() {
         </nav>
       )}
 
-      {/* Canvas Page: Back button & Theme */}
-      <div className={cn("flex items-center gap-2 pointer-events-auto", isCanvasPage && "bg-background/60 backdrop-blur-xl backdrop-saturate-150 rounded-full p-1.5 border border-border/40 shadow-sm")}>
-        {isCanvasPage && (
-          <Link 
-            to={projectId ? `/projects/${projectId}/canvases` : "/projects"}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all"
-          >
-            <Layers className="w-4 h-4" />
-            <span className="hidden sm:inline">返回项目</span>
-          </Link>
-        )}
-
+      {/* Right */}
+      <div className={cn("flex items-center gap-2 pointer-events-auto", isCanvasPage && "bg-background/70 backdrop-blur-xl backdrop-saturate-150 rounded-full p-1.5 border border-border/40 shadow-sm")}>
         <Button
           variant="ghost"
           size="icon"
