@@ -19,7 +19,7 @@ function Layout() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans antialiased">
       {/* 画布页面不显示Header，使用沉浸式体验 */}
-      <Header />
+      {!isCanvasPage && <Header />}
       <main className={cn(!isCanvasPage && 'pb-24 md:pb-0')}>
         <Routes>
           <Route path="/" element={<Navigate to="/workbench" replace />} />
