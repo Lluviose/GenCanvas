@@ -16,7 +16,7 @@ export default function MobileNav() {
   if (isCanvasPage) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card/85 backdrop-blur-sm md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card/85 backdrop-blur-xl md:hidden animate-slide-in-bottom">
       <div className="grid grid-cols-5 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -26,12 +26,15 @@ export default function MobileNav() {
               key={item.path}
               to={item.path}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-xs transition-colors',
+                'relative flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-xs transition-all duration-300',
                 active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className={cn('h-5 w-5', active && 'text-primary')} />
-              <span>{item.label}</span>
+              {active && (
+                <div className="absolute inset-0 bg-primary/10 rounded-xl -z-10 animate-fade-in" />
+              )}
+              <Icon className={cn('h-5 w-5 transition-transform duration-300', active && 'scale-110')} />
+              <span className={cn('transition-all duration-300', active ? 'font-medium' : '')}>{item.label}</span>
             </Link>
           );
         })}

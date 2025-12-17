@@ -103,8 +103,8 @@ export function PromptPartsEditor({
     token.setAttribute('contenteditable', 'false');
     token.className = cn(
       'inline-flex items-center gap-1 align-middle',
-      'mx-0.5 my-0.5 px-1 py-1 rounded-md border',
-      'bg-secondary/40 border-border',
+      'mx-0.5 my-0.5 px-1 py-1 rounded-md border transition-colors',
+      'bg-secondary/40 border-border hover:bg-secondary/60',
       img.annotation ? 'ring-1 ring-primary/40' : ''
     );
     if (img.annotation) token.title = img.annotation;

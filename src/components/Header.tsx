@@ -37,11 +37,14 @@ export default function Header() {
 
   return (
     <header className={cn(
-      "h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl backdrop-saturate-150 flex items-center justify-between px-4 sticky top-0 z-50 transition-all duration-300",
+      "h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl backdrop-saturate-150 flex items-center justify-between px-4 sticky top-0 z-50 transition-all duration-300 animate-slide-in-bottom",
       isCanvasPage && "border-b-0 bg-transparent backdrop-blur-none pointer-events-none absolute w-full p-4"
     )}>
       {/* Logo */}
-      <div className={cn("flex items-center gap-4 pointer-events-auto", isCanvasPage && "bg-background/60 backdrop-blur-xl backdrop-saturate-150 rounded-full pl-1.5 pr-4 py-1.5 border border-border/40 shadow-sm")}>
+      <div className={cn(
+        "flex items-center gap-4 pointer-events-auto transition-all duration-300",
+        isCanvasPage && "bg-background/60 backdrop-blur-xl backdrop-saturate-150 rounded-full pl-1.5 pr-4 py-1.5 border border-border/40 shadow-sm hover:shadow-md hover:bg-background/80"
+      )}>
         <Link to="/workbench" className="flex items-center gap-2 hover:opacity-80 transition-opacity group">
           <div className="relative w-8 h-8 rounded-lg overflow-hidden shadow-sm">
             {/* 流动彩虹背景 */}

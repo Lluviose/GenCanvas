@@ -83,7 +83,7 @@ export function ToastContainer() {
             key={t.id}
             className={cn(
               "flex items-center gap-3 pl-3 pr-4 py-3 rounded-2xl border backdrop-blur-xl shadow-2xl",
-              "animate-in slide-in-from-right-5 fade-in-0 duration-300",
+              "animate-toast-in",
               colorMap[t.type]
             )}
           >

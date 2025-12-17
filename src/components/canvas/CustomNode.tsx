@@ -208,7 +208,7 @@ const CustomNode = ({ data, selected }: NodeProps<NodeData>) => {
 
   return (
     <div className={cn(
-      "w-[320px] rounded-2xl transition-all duration-300 group",
+      "w-[320px] rounded-2xl transition-all duration-300 group animate-zoom-in",
       "bg-card/95 backdrop-blur-sm",
       "border shadow-xl",
       selected 

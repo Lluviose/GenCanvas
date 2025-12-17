@@ -460,7 +460,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
     const ids = selectedNodes.map((n) => n.id);
 
     return (
-      <div className="w-full bg-transparent h-full flex flex-col">
+      <div className="w-full bg-transparent h-full flex flex-col animate-slide-in-right">
         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">对比 {selectedNodes.length} 个节点</div>
@@ -627,7 +627,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   if (!nodeId || !selectedNode) {
     // 无选中节点时：提供 "画布检索" 和 "全局库" 两个 Tab
     return (
-      <div className="w-full bg-transparent h-full flex flex-col">
+      <div className="w-full bg-transparent h-full flex flex-col animate-slide-in-right">
         {/* Tab Header */}
         <div className="px-4 py-0 border-b border-white/5">
           <div className="flex items-center gap-6">
@@ -937,7 +937,7 @@ function SidebarContent({ onFocusNode }: SidebarProps) {
   }
 
   return (
-    <div className="w-full bg-transparent h-full flex flex-col">
+    <div className="w-full bg-transparent h-full flex flex-col animate-slide-in-right">
       {/* Header */}
       <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
         <div className="min-w-0">

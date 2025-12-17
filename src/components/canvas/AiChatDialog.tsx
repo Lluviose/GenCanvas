@@ -174,7 +174,7 @@ export function AiChatDialog({ open, onOpenChange, nodeId, imageId, onFocusNode 
                   <div
                     key={m.id}
                     className={cn(
-                      'rounded-lg px-3 py-2 text-sm whitespace-pre-wrap border',
+                      'rounded-lg px-3 py-2 text-sm whitespace-pre-wrap border animate-fade-in',
                       m.role === 'user'
                         ? 'bg-secondary/30 border-border text-foreground'
                         : 'bg-primary/5 border-primary/20 text-foreground'

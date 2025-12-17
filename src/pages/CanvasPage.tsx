@@ -656,7 +656,7 @@ function CanvasContent() {
           <Panel
             position="top-right"
             className={cn(
-              "!z-[100] pointer-events-none flex flex-col gap-2 sm:gap-3",
+              "!z-[100] pointer-events-none flex flex-col gap-2 sm:gap-3 animate-fade-in delay-100",
               isMobile ? "!m-2" : "!m-4"
             )}
           >
