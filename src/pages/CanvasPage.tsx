@@ -595,16 +595,24 @@ function CanvasContent() {
              {/* 占位，把位置留给 Header 的悬浮岛 */}
              {!isMobile && <div className="h-12 w-full"></div>}
 
-             {/* 手机端返回按钮 */}
-             {isMobile && (
-               <Link 
-                 to="/" 
-                 className="pointer-events-auto bg-card/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 dark:border-white/5 rounded-2xl shadow-2xl p-2.5 flex items-center gap-2 w-fit transition-all hover:bg-card/80 active:scale-95"
+             {/* 返回 / 首页 */}
+             <div className="pointer-events-auto bg-card/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 dark:border-white/5 rounded-2xl shadow-2xl p-1 flex items-center gap-1 w-fit transition-all hover:bg-card/80">
+               <Link
+                 to={`/projects/${projectId}/canvases`}
+                 className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
+                 title="返回画布列表"
                >
-                 <ArrowLeft className="w-5 h-5 text-foreground" />
-                 <Home className="w-4 h-4 text-muted-foreground" />
+                 <ArrowLeft className="w-5 h-5" />
                </Link>
-             )}
+               <div className="w-px h-5 bg-border/30 mx-0.5" />
+               <Link
+                 to="/projects"
+                 className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
+                 title="回到项目首页"
+               >
+                 <Home className="w-5 h-5" />
+               </Link>
+             </div>
 
              {/* Canvas Info Card */}
              <div className="pointer-events-auto bg-card/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 dark:border-white/5 rounded-3xl shadow-2xl p-1.5 flex flex-col gap-1 w-fit transition-all hover:bg-card/80 group">
