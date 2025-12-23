@@ -33,6 +33,7 @@ import {
   generateWorkbench,
   getWorkbenchHealth,
 } from '@/services/workbenchApi';
+import type { WorkbenchGenerateAttemptEvent } from '@/services/workbenchApi';
 import { toast } from '@/components/ui/toast';
 import { getPreferences } from './preferencesStore';
 import { bgTaskManager } from '@/services/backgroundTaskManager';
@@ -1035,122 +1036,124 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const taskId = await bgTaskManager.startTask(nodeId);
 
     try {
-      const resp = await generateWorkbench({
-        prompt: mergedData.prompt,
-        promptParts: mergedData.promptParts,
-        count: requestedCount,
-        imageSize: mergedData.imageSize,
-        aspectRatio: mergedData.aspectRatio,
-        inputImage,
-      });
-
-      const duration = performance.now() - startAt;
-      const finishedAt = new Date().toISOString();
-
-      const requested = Number(resp.requestedCount ?? requestedCount) || requestedCount;
-      const partialErrors = resp.partialErrors || [];
-      const failedSet = new Set<number>(
-        partialErrors.map((e) => Number(e.attempt)).filter((n) => Number.isFinite(n) && n >= 1)
-      );
-
-      const images = resp.images || [];
-      const thoughtSigs = resp.imageThoughtSignatures || [];
-      const thoughtTexts = resp.imageTextParts || [];
-      const thoughtTextSigs = resp.imageTextThoughtSignatures || [];
-      let successCursor = 0;
-
       const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const normalized: ImageMeta[] = [];
-      const nodePatches = new Map<string, Partial<NodeData>>();
 
-      for (let attempt = 1; attempt <= requested; attempt++) {
-        const idx = attempt - 1;
-        const targetNodeId = newIds[idx];
+      let succeeded = 0;
+      let failed = 0;
+      let lastErrorMessage: string | undefined = undefined;
+
+      for (let attempt = 1; attempt <= requestedCount; attempt++) {
+        const targetNodeId = newIds[attempt - 1];
         if (!targetNodeId) continue;
 
-        if (failedSet.has(attempt)) {
-          const msg =
-            partialErrors.find((e) => Number(e.attempt) === attempt)?.message ||
-            resp.error ||
-            resp.message ||
-            '生成失败';
-          nodePatches.set(targetNodeId, {
-            status: 'failed',
-            errorMessage: String(msg || '').trim() || '生成失败',
-            lastRunDurationMs: duration,
-            updatedAt: finishedAt,
-          });
-          continue;
-        }
-
-        const img = images[successCursor];
-        if (!img) {
-          nodePatches.set(targetNodeId, {
-            status: 'failed',
-            errorMessage: resp.error || 'No image generated',
-            lastRunDurationMs: duration,
-            updatedAt: finishedAt,
-          });
-          continue;
-        }
-
-        const imageId = `img_${targetNodeId}_${Date.now()}_0`;
-        const meta: ImageMeta = {
-          id: imageId,
-          nodeId: targetNodeId,
-          jobId,
-          url: toImageSrc(img),
-          createdAt: finishedAt,
-          isFavorite: false,
-          meta: {
+        const attemptStartAt = performance.now();
+        try {
+          const resp = await generateWorkbench({
             prompt: mergedData.prompt,
-            model: mergedData.modelName,
+            promptParts: mergedData.promptParts,
+            count: 1,
             imageSize: mergedData.imageSize,
             aspectRatio: mergedData.aspectRatio,
-            referenceImageId: effectiveReferenceImageId,
-            batchId,
-            batchKind,
-            batchAttempt: attempt,
-            thoughtSignature: thoughtSigs?.[successCursor],
-            thoughtText: thoughtTexts?.[successCursor],
-            thoughtTextSignature: thoughtTextSigs?.[successCursor],
-          },
-        };
+            inputImage,
+          });
 
-        normalized.push(meta);
-        nodePatches.set(targetNodeId, {
-          status: 'completed',
-          images: [meta],
-          lastRunDurationMs: duration,
-          errorMessage: undefined,
-          updatedAt: finishedAt,
-        });
+          const attemptDuration = performance.now() - attemptStartAt;
+          const finishedAt = new Date().toISOString();
 
-        successCursor += 1;
+          const images = resp.images || [];
+          if (images.length === 0) {
+            throw new Error(resp.error || resp.message || 'No image generated');
+          }
+
+          const thoughtSigs = resp.imageThoughtSignatures || [];
+          const thoughtTexts = resp.imageTextParts || [];
+          const thoughtTextSigs = resp.imageTextThoughtSignatures || [];
+
+          const metas: ImageMeta[] = images.map((img, idx) => ({
+            id: `img_${targetNodeId}_${Date.now()}_${idx}`,
+            nodeId: targetNodeId,
+            jobId,
+            url: toImageSrc(img),
+            createdAt: finishedAt,
+            isFavorite: false,
+            meta: {
+              prompt: mergedData.prompt,
+              model: mergedData.modelName,
+              imageSize: mergedData.imageSize,
+              aspectRatio: mergedData.aspectRatio,
+              referenceImageId: effectiveReferenceImageId,
+              batchId,
+              batchKind,
+              batchAttempt: attempt,
+              thoughtSignature: thoughtSigs?.[idx],
+              thoughtText: thoughtTexts?.[idx],
+              thoughtTextSignature: thoughtTextSigs?.[idx],
+            },
+          }));
+
+          normalized.push(...metas);
+          succeeded += 1;
+
+          set((prev) => ({
+            nodes: prev.nodes.map((n) =>
+              n.id === targetNodeId
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      status: 'completed',
+                      images: metas,
+                      lastRunDurationMs: attemptDuration,
+                      errorMessage: undefined,
+                      updatedAt: finishedAt,
+                    },
+                  }
+                : n
+            ),
+            galleryImages: metas.length > 0 ? [...metas, ...prev.galleryImages] : prev.galleryImages,
+          }));
+        } catch (error: any) {
+          const attemptDuration = performance.now() - attemptStartAt;
+          const finishedAt = new Date().toISOString();
+          const message = String(error?.message || error || '生成失败').trim() || '生成失败';
+          lastErrorMessage = message;
+          failed += 1;
+
+          set((prev) => ({
+            nodes: prev.nodes.map((n) =>
+              n.id === targetNodeId
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      status: 'failed',
+                      lastRunDurationMs: attemptDuration,
+                      errorMessage: message,
+                      updatedAt: finishedAt,
+                    },
+                  }
+                : n
+            ),
+          }));
+        }
       }
 
-      set((prev) => ({
-        nodes: prev.nodes.map((n) => {
-          const patch = nodePatches.get(n.id);
-          if (!patch) return n;
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              ...patch,
-            },
-          };
-        }),
-        galleryImages: normalized.length > 0 ? [...normalized, ...prev.galleryImages] : prev.galleryImages,
-      }));
+      const duration = performance.now() - startAt;
+
+      if (succeeded === 0) {
+        const msg = lastErrorMessage || '生成失败';
+        bgTaskManager.failTask(taskId, msg);
+        if (!options?.silent) toast.error(msg);
+        return null;
+      }
 
       // 标记任务完成
       bgTaskManager.completeTask(taskId);
 
       if (!options?.silent) {
-        const failed = Array.from(nodePatches.values()).filter((p) => p.status === 'failed').length;
         if (failed > 0) {
-          toast.success(`图片生成完成（部分失败 ${failed}/${requested}），耗时 ${(duration / 1000).toFixed(1)} s`);
+          toast.success(`图片生成完成（部分失败 ${failed}/${requestedCount}），耗时 ${(duration / 1000).toFixed(1)} s`);
         } else {
           toast.success(`图片生成完成，耗时 ${(duration / 1000).toFixed(1)} s`);
         }
@@ -1734,6 +1737,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
                 status: 'running',
                 errorMessage: undefined,
                 lastRunAt: startedAt,
+                images: [],
                 updatedAt: startedAt,
               },
             }
@@ -1762,6 +1766,100 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         }
       }
 
+      const requestedCount = Math.max(1, Math.min(8, Number(mergedData.count) || 1));
+      const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const normalized: ImageMeta[] = [];
+      const progressErrors: Array<{ attempt: number; message: string }> = [];
+
+      const buildProgressErrorMessage = () => {
+        if (progressErrors.length === 0) return undefined;
+        const failedCount = progressErrors.length;
+        const details = progressErrors
+          .slice(0, 3)
+          .map((e) => `#${e.attempt} ${String(e.message || '').trim()}`)
+          .filter(Boolean)
+          .join('；');
+        const more = progressErrors.length > 3 ? `…(+${progressErrors.length - 3})` : '';
+        const summary = `部分失败：${failedCount}/${requestedCount}`;
+        const msg = details ? `${summary}。${details}${more}` : summary;
+        return msg.length > 240 ? `${msg.slice(0, 240)}…` : msg;
+      };
+
+      const onAttempt = (event: WorkbenchGenerateAttemptEvent) => {
+        if ('error' in event) {
+          progressErrors.push({ attempt: event.attempt, message: event.error });
+          const runErrorMessage = buildProgressErrorMessage();
+          set((prev) => ({
+            nodes: prev.nodes.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      errorMessage: runErrorMessage,
+                      updatedAt: new Date().toISOString(),
+                    },
+                  }
+                : n
+            ),
+          }));
+          return;
+        }
+
+        const now = new Date().toISOString();
+        const storedImages: StoredImage[] = [];
+        const metas: ImageMeta[] = (event.images || []).map((img, idx) => {
+          const imageId = `img_${id}_${Date.now()}_${event.attempt}_${idx}`;
+          const dataUrl = toImageSrc(img);
+          const parsed = parseDataUrl(imageId, dataUrl);
+          if (parsed) storedImages.push(parsed);
+          return {
+            id: imageId,
+            nodeId: id,
+            jobId,
+            url: parsed ? createIndexedDBRef(imageId) : dataUrl,
+            createdAt: now,
+            isFavorite: false,
+            meta: {
+              prompt: mergedData.prompt,
+              model: mergedData.modelName,
+              imageSize: mergedData.imageSize,
+              aspectRatio: mergedData.aspectRatio,
+              referenceImageId: mergedData.referenceImageId,
+              thoughtSignature: event.imageThoughtSignatures?.[idx],
+              thoughtText: event.imageTextPart,
+              thoughtTextSignature: event.imageTextThoughtSignature,
+            },
+          };
+        });
+
+        if (storedImages.length > 0) {
+          saveImagesToIndexedDB(storedImages).catch((err) => {
+            console.warn('Failed to save images to IndexedDB', err);
+          });
+        }
+
+        normalized.push(...metas);
+
+        const runErrorMessage = buildProgressErrorMessage();
+        set((prev) => ({
+          nodes: prev.nodes.map((n) =>
+            n.id === id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    images: [...(n.data.images || []), ...metas],
+                    errorMessage: runErrorMessage,
+                    updatedAt: now,
+                  },
+                }
+              : n
+          ),
+          galleryImages: metas.length > 0 ? [...metas, ...prev.galleryImages] : prev.galleryImages,
+        }));
+      };
+
       const resp = await (async () => {
         try {
           return await generateWorkbench({
@@ -1772,12 +1870,31 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             imageSize: mergedData.imageSize,
             aspectRatio: mergedData.aspectRatio,
             inputImage,
-          });
+          }, { onAttempt });
         } catch (error: any) {
           const message = String(error?.message || '');
           const shouldFallback =
             hasCustomContents && /thought_signature|MISSING_THOUGHT_SIGNATURE/i.test(message);
           if (!shouldFallback) throw error;
+
+          // Reset streaming buffers/UI before fallback
+          normalized.length = 0;
+          progressErrors.length = 0;
+          set((prev) => ({
+            nodes: prev.nodes.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      images: [],
+                      errorMessage: undefined,
+                      updatedAt: new Date().toISOString(),
+                    },
+                  }
+                : n
+            ),
+          }));
 
           let fallbackInput: Base64Image | undefined = inputImage;
           if (!fallbackInput) {
@@ -1808,57 +1925,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             imageSize: mergedData.imageSize,
             aspectRatio: mergedData.aspectRatio,
             inputImage: fallbackInput,
-          });
+          }, { onAttempt });
         }
       })();
 
-      const images = resp.images || [];
-      if (!images.length) {
-        throw new Error(resp.error || 'No images generated');
-      }
-
-      const now = new Date().toISOString();
-      const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-      // Prepare images for IndexedDB storage
-      const storedImages: StoredImage[] = [];
-      const normalized: ImageMeta[] = images.map((img, idx) => {
-        const imageId = `img_${id}_${Date.now()}_${idx}`;
-        const dataUrl = toImageSrc(img);
-        const parsed = parseDataUrl(imageId, dataUrl);
-        if (parsed) {
-          storedImages.push(parsed);
-        }
-        return {
-          id: imageId,
-          nodeId: id,
-          jobId,
-          // Use IndexedDB reference if parsed successfully, otherwise fallback to data URL
-          url: parsed ? createIndexedDBRef(imageId) : dataUrl,
-          createdAt: now,
-          isFavorite: false,
-          meta: {
-            prompt: mergedData.prompt,
-            model: mergedData.modelName,
-            imageSize: mergedData.imageSize,
-            aspectRatio: mergedData.aspectRatio,
-            referenceImageId: mergedData.referenceImageId,
-            thoughtSignature: resp.imageThoughtSignatures?.[idx],
-            thoughtText: resp.imageTextParts?.[idx],
-            thoughtTextSignature: resp.imageTextThoughtSignatures?.[idx],
-          },
-        };
-      });
-
-      // Save images to IndexedDB (async, non-blocking)
-      if (storedImages.length > 0) {
-        saveImagesToIndexedDB(storedImages).catch((err) => {
-          console.warn('Failed to save images to IndexedDB', err);
-        });
-      }
-
       const partialErrors = resp.partialErrors || [];
-      const requestedCount = Number(resp.requestedCount ?? mergedData.count) || mergedData.count;
       const failedCount = Number(resp.failedCount ?? partialErrors.length) || partialErrors.length;
       let runErrorMessage: string | undefined = undefined;
       if (partialErrors.length > 0) {
@@ -1892,7 +1963,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
               }
             : n
         ),
-        galleryImages: [...normalized, ...prev.galleryImages],
       }));
 
       // 标记任务完成

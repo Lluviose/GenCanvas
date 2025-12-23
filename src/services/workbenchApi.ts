@@ -13,6 +13,16 @@ import type { Base64Image } from '@/types/media';
 import { getWorkbenchSettings } from '@/store/workbenchSettingsStore';
 import { getPreferences } from '@/store/preferencesStore';
 
+export type WorkbenchGenerateAttemptEvent =
+  | {
+      attempt: number;
+      images: Base64Image[];
+      imageThoughtSignatures: Array<string | undefined>;
+      imageTextPart?: string;
+      imageTextThoughtSignature?: string;
+    }
+  | { attempt: number; error: string };
+
 const API_TIMEOUT_MS = 300_000;
 const GENERATION_MIN_INTERVAL_MS = 1000;
 
@@ -430,7 +440,10 @@ export const getWorkbenchHealth = async (): Promise<WorkbenchHealth> => {
   } as WorkbenchHealth;
 };
 
-export const generateWorkbench = async (payload: WorkbenchGenerateRequest): Promise<WorkbenchGenerateResponse> => {
+export const generateWorkbench = async (
+  payload: WorkbenchGenerateRequest,
+  options?: { onAttempt?: (event: WorkbenchGenerateAttemptEvent) => void }
+): Promise<WorkbenchGenerateResponse> => {
   const s = getWorkbenchSettings();
   if (isOpenAIFormat(s)) {
     throw new Error('OpenAI 模式当前不支持图片生成，请切换到 Gemini 模式');
@@ -466,18 +479,35 @@ export const generateWorkbench = async (payload: WorkbenchGenerateRequest): Prom
       texts.push(...extracted.texts);
 
       if (!extracted.images.length) {
-        partialErrors.push({ attempt: i + 1, message: '本次请求未返回图片' });
+        const message = '本次请求未返回图片';
+        partialErrors.push({ attempt: i + 1, message });
+        // no images, report progress as error
+        options?.onAttempt?.({ attempt: i + 1, error: message });
         continue;
       }
 
+      const imageThoughtSigs = extracted.imageThoughtSignatures || [];
+      const textPart = extracted.signedTextPart?.text;
+      const textSig = extracted.signedTextPart?.thoughtSignature;
+
       images.push(...extracted.images);
-      imageThoughtSignatures.push(...(extracted.imageThoughtSignatures || []));
-      for (let j = 0; j < (extracted.images || []).length; j++) {
-        imageTextParts.push(extracted.signedTextPart?.text);
-        imageTextThoughtSignatures.push(extracted.signedTextPart?.thoughtSignature);
+      imageThoughtSignatures.push(...imageThoughtSigs);
+      for (let j = 0; j < extracted.images.length; j++) {
+        imageTextParts.push(textPart);
+        imageTextThoughtSignatures.push(textSig);
       }
+
+      options?.onAttempt?.({
+        attempt: i + 1,
+        images: extracted.images,
+        imageThoughtSignatures: imageThoughtSigs,
+        imageTextPart: textPart,
+        imageTextThoughtSignature: textSig,
+      });
     } catch (error: any) {
-      partialErrors.push({ attempt: i + 1, message: String(error?.message || error || '未知错误') });
+      const message = String(error?.message || error || '未知错误');
+      partialErrors.push({ attempt: i + 1, message });
+      options?.onAttempt?.({ attempt: i + 1, error: message });
     }
   }
 
